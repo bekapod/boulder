@@ -1,5 +1,7 @@
 # boulder
 
+[![CI](https://github.com/bekapod/boulder/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bekapod/boulder/actions/workflows/ci.yml)
+
 A Game Boy game, written in assembly for the original DMG hardware.
 
 ## Prerequisites
