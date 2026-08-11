@@ -20,6 +20,10 @@ $(ROM_NAME).gb: $(OBJS)
 
 .SECONDARY: $(CHRS) $(TLMS)
 
+.PHONY: test
+test: $(ROM_NAME).gb
+	uv run --project tests pytest tests
+
 .PHONY: clean
 clean:
 	rm -f *.o *.chr *.tlm $(ROM_NAME).gb $(ROM_NAME).map $(ROM_NAME).sym

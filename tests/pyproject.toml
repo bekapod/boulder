@@ -1,0 +1,12 @@
+[project]
+name = "boulder-tests"
+version = "0.1.0"
+description = "PyBoy test harness for the boulder ROM"
+requires-python = ">=3.10"
+dependencies = [
+    "pyboy>=2.7",
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
