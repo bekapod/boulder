@@ -1,0 +1,17 @@
+include "utils.rgbinc"
+
+section "play_ram", wram0
+
+section "play", rom0
+Play_Init:
+  SwitchState Play_Update, STATE_PLAY
+  ret
+
+Play_Update:
+  ld a, [wInputPressed]
+  and a, PADF_START
+  ret nz
+  SwitchState GameOver_Init, STATE_GAMEOVER
+  ret
+
+export Play_Init

@@ -1,0 +1,70 @@
+include "hardware.rgbinc"
+include "utils.rgbinc"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+section "header", rom0[$0100]
+entrypoint:
+  di
+  jp main
+  ds ($0150 - @), 0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+section "vblank_interrupt", rom0[$0040]
+  reti
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+section "main_ram", wram0
+; input struct
+wPadInput:
+wInputHeld:    ds 1   ; PAD_INPUT_CURRENT
+               ds 1   ; PAD_INPUT_PREVIOUS (private)
+wInputPressed: ds 1
+               ds 1   ; PAD_INPUT_RELEASED (private)
+wStateFn: ds 2
+wStateId: ds 1
+
+assert (wInputHeld - wPadInput) == PAD_INPUT_CURRENT
+assert (wInputPressed - wPadInput) == PAD_INPUT_PRESSED
+export wInputHeld, wInputPressed, wStateFn, wStateId
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+section "main", rom0
+main:
+  DisableLCD
+  InitPadInput wPadInput
+  
+  ; init the palette
+  ld a, %11100100
+  ld [rBGP], a
+  ld [rOBP0], a
+  ld a, %00011011
+  ld [rOBP1], a
+
+  ; set the graphics parameters and turn LCD back on
+  ld a, LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ16 | LCDCF_OBJON | LCDCF_BGON
+  ld [rLCDC], a
+
+  ; enable the vblank interrupt
+  ld a, IEF_VBLANK
+  ld [rIE], a
+
+  SwitchState Title_Init, STATE_TITLE
+
+  ei
+
+  .loop
+    halt
+
+    UpdatePadInput wPadInput
+
+    ld a, [wStateFn]
+    ld l, a
+    ld a, [wStateFn + 1]
+    ld h, a
+    ld de, .loop
+    push de
+    jp hl
