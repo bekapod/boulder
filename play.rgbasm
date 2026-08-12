@@ -1,13 +1,43 @@
 include "utils.rgbinc"
 
+def MARKER_X_MIN equ 16
+def MARKER_X_MAX equ 152
+
 section "play_ram", wram0
+wMarkerDir: ds 1
+
+export wMarkerDir
 
 section "play", rom0
 Play_Init:
+  call ClearShadowOAM
+  copy [wShadowOAM + OAMA_Y], 88
+  copy [wShadowOAM + OAMA_X], 88
+  copy [wShadowOAM + OAMA_TILEID], 1 ; tile 1, the marker
+  copy [wShadowOAM + OAMA_FLAGS], 0 ; attrs 0 = no flips, in front of BG, OBP0 (object palette 0)
+  copy [wMarkerDir], 1
   SwitchState Play_Update, STATE_PLAY
   ret
 
 Play_Update:
+  ld a, [wMarkerDir] ; store direction in a
+  ld b, a ; move to b
+  ld a, [wShadowOAM + 1] ; store X in a
+  add a, b ; a = X + direction
+  ld [wShadowOAM + 1], a ; store the new X
+
+  ld hl, wMarkerDir ; point hl at the direction byte
+  ; "compare" = subtract: a - MARKER_X_MAX, discard the result, but set flags
+  ; zero flag on = they were equal, a is not modified unlike with sub
+  cp a, MARKER_X_MAX ; compare the new X with the max
+  jr nz, .not_at_right ; not equal, skip next line
+  ld [hl], $FF ; we are at the right end, direction = -1
+  .not_at_right:
+  cp a, MARKER_X_MIN ; compare the new X with the min
+  jr nz, .not_at_left ; not equal, skip next line
+  ld [hl], 1 ; at the left end: direction = +1
+  .not_at_left:
+
   ld a, [wInputPressed]
   and a, PADF_START
   ret nz

@@ -15,6 +15,9 @@ $(ROM_NAME).gb: $(OBJS)
 %_map.tlm: %_map.png tileset.chr
 	rgbgfx --unique-tiles --input-tileset tileset.chr --tilemap $@ $<
 
+%_obj.chr: %_obj.png
+	rgbgfx --colors '#9bbc0f,#8bac0f,#306230,#0f380f' --output $@ $<
+
 %.chr: %.png
 	rgbgfx --unique-tiles --output $@ $<
 

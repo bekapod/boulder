@@ -1,0 +1,36 @@
+include "utils.rgbinc"
+
+section "memory", rom0
+
+; copy (bc) bytes from (hl) to (de)
+; trashes a. hl and de end up one past their last byte
+; b needs to be copied to a because all 8-bit math has a hardwired
+; as the left side (or a, b, or a, c, or a, [hl]...)
+MemCopy:
+  .loop:
+    ld a, [hli]
+    ld [de], a
+    inc de
+    dec bc ; dec bc sets no flags so test bc == 0 by ORing the halves
+    ld a, b
+    or a, c
+    jr nz, .loop
+  ret
+
+export MemCopy
+
+; fill (bc) bytes at (hl) with value (d)
+; trashes a
+; b needs to be copied to a because all 8-bit math has a hardwired
+; as the left side (or a, b, or a, c, or a, [hl]...)
+MemSet:
+  .loop:
+    ld a, d
+    ld [hli], a
+    dec bc ; dec bc sets no flags so test bc == 0 by ORing the halves
+    ld a, b
+    or a, c
+    jr nz, .loop
+  ret
+
+export MemSet

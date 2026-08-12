@@ -4,6 +4,7 @@ section "game_over_ram", wram0
 
 section "game_over", rom0
 GameOver_Init:
+  call ClearShadowOAM
   SwitchState GameOver_Update, STATE_GAMEOVER
   ret
 

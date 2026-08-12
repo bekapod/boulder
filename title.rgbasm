@@ -4,6 +4,7 @@ section "title_ram", wram0
 
 section "title", rom0
 Title_Init:
+  call ClearShadowOAM
   SwitchState Title_Update, STATE_TITLE
   ret
 

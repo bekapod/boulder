@@ -32,10 +32,54 @@ export wInputHeld, wInputPressed, wStateFn, wStateId
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; a copy of OAM (40 sprites) that game code is free to
+; write whenever it wants.
+; align[8]: the DMA register is told only which 256-byte page to
+; copy from, so this buffer must start exactly at the top of a page
+section "shadow_oam", wram0, align[8]
+wShadowOAM: ds OAM_COUNT * sizeof_OAM_ATTRS
+
+export wShadowOAM
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+section "sprite_tiles", rom0
+MarkerTileData:
+  incbin "marker_obj.chr"
+MarkerTileData_End:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 section "main", rom0
 main:
   DisableLCD
   InitPadInput wPadInput
+
+  ; copy the DMA routine into HRAM b/c during DMA the CPU can only
+  ; execute from HRAM, so the routine must be there and not in ROM
+  ld hl, OamDmaFunction
+  ld de, hOamDma
+  ld bc, OamDmaFunction_End - OamDmaFunction
+  call MemCopy
+
+  ; the first DMA fires before any state's init runs, so the buffer
+  ; must already be clean here
+  call ClearShadowOAM
+
+  ; load the marker into tile slot 1 (VRAM + 16)
+  ; slot 0 stays blank b/c the BG tilemap's empty cells point at
+  ; tile 0 (BG and OBJ share $8000)
+  ; VRAM is only _freely_ writable while the LCD is off
+  ld hl, MarkerTileData
+  ld de, _VRAM + 16
+  ld bc, MarkerTileData_End - MarkerTileData
+  call MemCopy
+
+  ; wipe the boot ROM's leftover Nintendo logo from the tilemap
+  ld hl, _SCRN0
+  ld d, 0
+  ld bc, 32 * 32
+  call MemSet
   
   ; init the palette
   ld a, %11100100
@@ -45,7 +89,7 @@ main:
   ld [rOBP1], a
 
   ; set the graphics parameters and turn LCD back on
-  ld a, LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ16 | LCDCF_OBJON | LCDCF_BGON
+  ld a, LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ8 | LCDCF_OBJON | LCDCF_BGON
   ld [rLCDC], a
 
   ; enable the vblank interrupt
@@ -59,6 +103,10 @@ main:
   .loop
     halt
 
+    ; halt wakes on vblank, so this runs at the start of the vblank
+    ; window - this is the only safe time to touch OAM
+    call hOamDma
+
     UpdatePadInput wPadInput
 
     ld a, [wStateFn]
@@ -68,3 +116,36 @@ main:
     ld de, .loop
     push de
     jp hl
+
+  ; this code gets copied into HRAM on startup and runs there as hOamDma
+  ; never called here in ROM. uses jr and not jp so it still works
+  ; after moving. the loop is just a timer b/c the DMA has no "done" flag
+  ; to check, this always takes 160 cycles (40 iterations of dec + jr)
+  OamDmaFunction:
+    ld a, high(wShadowOAM)
+    ldh [rDMA], a
+
+    ld a, 40
+    .wait_dma:
+      dec a
+      jr nz, .wait_dma
+
+    ret
+  OamDmaFunction_End:
+
+  ; hide all 40 sprites in the shadow OAM buffer. this is called at 
+  ; startup and in every state's Init
+  ClearShadowOAM:
+    ld hl, wShadowOAM
+    ld d, 0
+    ld bc, OAM_COUNT * sizeof_OAM_ATTRS
+    jp MemSet ; tail call, MemSet's own ret returns back to caller
+
+export ClearShadowOAM
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+section "hram", hram
+hOamDma: ds OamDmaFunction_End - OamDmaFunction
+
+export hOamDma
