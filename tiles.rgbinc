@@ -1,0 +1,9 @@
+if !def(TILES_RGBINC)
+def TILES_RGBINC equ 1
+
+; which VRAM tile slots hold which art
+; slot 0 stays blank b/c empty tilemap cells point at it
+def TILE_MARKER equ 1
+def TILE_BAR_FIRST equ 2
+
+endc

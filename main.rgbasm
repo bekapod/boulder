@@ -1,4 +1,5 @@
 include "hardware.rgbinc"
+include "tiles.rgbinc"
 include "utils.rgbinc"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -43,10 +44,14 @@ export wShadowOAM
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-section "sprite_tiles", rom0
+section "tiles", rom0
 MarkerTileData:
   incbin "marker_obj.chr"
 MarkerTileData_End:
+
+BarTileData:
+  incbin "bar_bg.chr"
+BarTileData_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -66,13 +71,16 @@ main:
   ; must already be clean here
   call ClearShadowOAM
 
-  ; load the marker into tile slot 1 (VRAM + 16)
-  ; slot 0 stays blank b/c the BG tilemap's empty cells point at
-  ; tile 0 (BG and OBJ share $8000)
+  ; load the art into specified tiles
   ; VRAM is only _freely_ writable while the LCD is off
   ld hl, MarkerTileData
-  ld de, _VRAM + 16
+  ld de, _VRAM + TILE_MARKER * 16
   ld bc, MarkerTileData_End - MarkerTileData
+  call MemCopy
+
+  ld hl, BarTileData
+  ld de, _VRAM + TILE_BAR_FIRST * 16
+  ld bc, BarTileData_End - BarTileData
   call MemCopy
 
   ; wipe the boot ROM's leftover Nintendo logo from the tilemap

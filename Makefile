@@ -15,11 +15,10 @@ $(ROM_NAME).gb: $(OBJS)
 %_map.tlm: %_map.png tileset.chr
 	rgbgfx --unique-tiles --input-tileset tileset.chr --tilemap $@ $<
 
-%_obj.chr: %_obj.png
-	rgbgfx --colors '#9bbc0f,#8bac0f,#306230,#0f380f' --output $@ $<
-
+# don't use --unique-tiles here b/c play.rgbasm writes sequential tile
+# indices for the bar, so duplicate tiles must keep their slots
 %.chr: %.png
-	rgbgfx --unique-tiles --output $@ $<
+	rgbgfx --colors '#9bbc0f,#8bac0f,#306230,#0f380f' --output $@ $<
 
 .SECONDARY: $(CHRS) $(TLMS)
 

@@ -56,6 +56,15 @@ def states() -> dict[str, int]:
     return found
 
 
+@pytest.fixture(scope="session")
+def tuning() -> dict[str, int]:
+    """Gameplay-feel constants parsed from tuning.rgbinc."""
+    src = (ROOT / "tuning.rgbinc").read_text()
+    found = {m[0]: int(m[1]) for m in re.findall(r"(?m)^def (\w+) equ (\d+)", src)}
+    assert found, "no constants found in tuning.rgbinc"
+    return found
+
+
 @pytest.fixture
 def gb():
     if not ROM.exists():

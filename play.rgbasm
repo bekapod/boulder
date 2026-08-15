@@ -1,47 +1,121 @@
+include "tiles.rgbinc"
+include "tuning.rgbinc"
 include "utils.rgbinc"
 
-def MARKER_X_MIN equ 16
-def MARKER_X_MAX equ 152
+def BAR_TILE_COL equ 1
+def BAR_TILE_ROW equ 16
+def BAR_WIDTH_TILES equ 9
+def MARKER_WIDTH equ 8
+def MARKER_TIP equ MARKER_WIDTH / 2
+; bar tile x + border + OAM offset
+def MARKER_OAM_X_BASE equ BAR_TILE_COL * 8 + 4 + 8 - MARKER_TIP
+def MARKER_OAM_Y equ BAR_TILE_ROW * 8 + 5 + 16 ; 5 = 8px row minus 3px overlap into the bar
 
 section "play_ram", wram0
 wMarkerDir: ds 1
+wMarkerPos: ds 2 ; 8.8 fixed-point: +0 = fraction, +1 = whole pixels
+wMarkerPause: ds 1
+wCycleFrames: ds 1
 
-export wMarkerDir
+export wMarkerDir, wMarkerPos, wCycleFrames
 
 section "play", rom0
 Play_Init:
+  ; draw the bar
+  ; needs to be first b/c VRAM writes only stick during vblank, and the
+  ; rest of init runs past the vblank window
+  ld hl, _SCRN0 + BAR_TILE_ROW * 32 + BAR_TILE_COL
+  ld a, TILE_BAR_FIRST
+
+  .draw_bar:
+    ld [hli], a ; write a into hl, then increment hl by 1
+    inc a
+    cp a, TILE_BAR_FIRST + BAR_WIDTH_TILES
+    jr nz, .draw_bar
+
   call ClearShadowOAM
-  copy [wShadowOAM + OAMA_Y], 88
-  copy [wShadowOAM + OAMA_X], 88
-  copy [wShadowOAM + OAMA_TILEID], 1 ; tile 1, the marker
+  copy [wShadowOAM + OAMA_Y], MARKER_OAM_Y
+  copy [wShadowOAM + OAMA_X], MARKER_OAM_X_BASE
+  copy [wShadowOAM + OAMA_TILEID], TILE_MARKER
   copy [wShadowOAM + OAMA_FLAGS], 0 ; attrs 0 = no flips, in front of BG, OBP0 (object palette 0)
-  copy [wMarkerDir], 1
+  copy [wMarkerDir], 0 ; 0 = moving right, 1 = moving left
+  copy [wMarkerPos], 0
+  copy [wMarkerPos + 1], 0
+  copy [wMarkerPause], 0
+  copy [wCycleFrames], CYCLE_FRAMES
+
   SwitchState Play_Update, STATE_PLAY
   ret
 
 Play_Update:
-  ld a, [wMarkerDir] ; store direction in a
-  ld b, a ; move to b
-  ld a, [wShadowOAM + 1] ; store X in a
-  add a, b ; a = X + direction
-  ld [wShadowOAM + 1], a ; store the new X
+  ld a, [wMarkerPause] ; 0 = not pausing, else frames left to wait
+  and a, a ; zero-test, nothing changes in a but it sets flags as side-effect, zero flag is now "was a zero?"
+  jr z, .not_paused
+  dec a
+  ld [wMarkerPause], a ; decrement by one frame and re-store
+  jr .render ; frozen: skip movement but still draw
+  .not_paused:
+  ld a, [wCycleFrames]
 
-  ld hl, wMarkerDir ; point hl at the direction byte
-  ; "compare" = subtract: a - MARKER_X_MAX, discard the result, but set flags
-  ; zero flag on = they were equal, a is not modified unlike with sub
-  cp a, MARKER_X_MAX ; compare the new X with the max
-  jr nz, .not_at_right ; not equal, skip next line
-  ld [hl], $FF ; we are at the right end, direction = -1
-  .not_at_right:
-  cp a, MARKER_X_MIN ; compare the new X with the min
-  jr nz, .not_at_left ; not equal, skip next line
-  ld [hl], 1 ; at the left end: direction = +1
-  .not_at_left:
+  sub a, MARKER_CYCLE_MIN ; converts a cycle value (4..60) to an entry number (0..56)
+  add a, a ; * 2 - each entry is two bytes
+  ld e, a
+  ld d, 0 ; de = byte offset, widened from 8 bits to 16 bits
+  ld hl, MarkerIncrements
+  add hl, de ; hl -> this cycle's entry
+  ld a, [hli]
+  ld e, a
+  ld d, [hl]
+
+  ; wMarkerPos is progress through the current sweep, 8.8 fixed-point,
+  ; always counting up from 0 to BAR_INNER_WIDTH. add the increment to
+  ; the fraction byte first; if it spills over, the carry flag remembers
+  ; and adc passes the spill into the whole-pixel byte
+  ld a, [wMarkerPos]
+  add a, e
+  ld [wMarkerPos], a
+  ld a, [wMarkerPos + 1]
+  adc a, d
+  ld [wMarkerPos + 1], a
+  cp a, BAR_INNER_WIDTH
+  jr c, .render
+  .sweep_ended: ; restart progress for the next sweep and turn around
+    copy [wMarkerPos], 0
+    copy [wMarkerPos + 1], 0
+    ld a, [wMarkerDir]
+    xor a, 1 ; flip 0 <-> 1
+    ld [wMarkerDir], a
+    copy [wMarkerPause], MARKER_PAUSE_FRAMES
+
+  .render:
+    ; round progress to whole pixels: carry = "fraction >= 0.5"
+    ld a, [wMarkerPos]
+    add a, 128
+    ld a, [wMarkerPos + 1]
+    adc a, 0 ; a = 0..BAR_INNER_WIDTH whole pixels of progress
+    ld b, a
+    ld a, [wMarkerDir]
+    and a, a
+    jr z, .from_left ; dir 0: progress measures from the left
+    ld a, BAR_INNER_WIDTH ; dir 1: mirror it, measure from the right
+    sub a, b
+    ld b, a
+    .from_left:
+    ld a, b
+    add a, MARKER_OAM_X_BASE
+    ld [wShadowOAM + OAMA_X], a
 
   ld a, [wInputPressed]
   and a, PADF_START
   ret nz
   SwitchState GameOver_Init, STATE_GAMEOVER
   ret
+
+; each entry is "to cross the bar's inner width in CYCLE frames
+; how much do I add per frame?
+MarkerIncrements:
+  for CYCLE, MARKER_CYCLE_MIN, MARKER_CYCLE_MAX + 1
+    dw (BAR_INNER_WIDTH * 256 + CYCLE - 1) / CYCLE
+  endr
 
 export Play_Init
