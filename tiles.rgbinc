@@ -5,5 +5,6 @@ def TILES_RGBINC equ 1
 ; slot 0 stays blank b/c empty tilemap cells point at it
 def TILE_MARKER equ 1
 def TILE_BAR_FIRST equ 2
+def TILE_BAR_DARK_FIRST equ TILE_BAR_FIRST + 9 ; dark variants of bar tiles 3..5
 
 endc

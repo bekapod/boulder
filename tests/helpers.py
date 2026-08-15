@@ -37,6 +37,10 @@ SWEET_MARGIN = 4
 SWEET_LO = _T["SWEET_SPOT_MIN"] + SWEET_MARGIN
 SWEET_HI = _T["SWEET_SPOT_MAX"] - SWEET_MARGIN
 
+SWEEP_CAP = (
+    _T["CYCLE_FRAMES"] + _T["MARKER_PAUSE_FRAMES"] + _T["HIT_FREEZE_FRAMES"] + 16
+)
+
 
 def addr(gb, symbol: str) -> int:
     return gb.pyboy.symbol_lookup(symbol)[1]
@@ -73,7 +77,7 @@ def enter_play(gb, states) -> None:
 def next_sweep(gb) -> None:
     """Run until the endpoint flip that starts a fresh (unjudged) sweep."""
     d = gb.read("wMarkerDir")
-    tick_until(gb, lambda: gb.read("wMarkerDir") != d, 80, "sweep end")
+    tick_until(gb, lambda: gb.read("wMarkerDir") != d, SWEEP_CAP, "sweep end")
 
 
 def tap_a(gb) -> None:

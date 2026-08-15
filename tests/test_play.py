@@ -4,6 +4,7 @@ from helpers import (
     enter_play,
     miss_once,
     next_sweep,
+    progress,
     screen_pos,
     tap_a,
     tick_until,
@@ -112,3 +113,28 @@ def test_pause_presses_are_ignored(gb, states, tuning):
     before = gb.read16("wAltitude")
     tap_a(gb)
     assert gb.read16("wAltitude") == before + tuning["HIT_REWARD"]
+
+
+def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
+    """a hit halts the marker and darkens the spot, both for HIT_FREEZE_FRAMES."""
+    SPOT = 0x9800 + 16 * 32 + 4  # tilemap: bar row, cells 4..6
+
+    def cells():
+        return [gb.pyboy.memory[SPOT + i] for i in range(3)]
+
+    enter_play(gb, states)
+    light = cells()  # capture "normal"
+
+    tick_until(gb, lambda: SWEET_LO <= screen_pos(gb) <= SWEET_HI, 200, "sweet spot")
+    tap_a(gb)
+    assert gb.read("wMissStreak") == 0
+
+    p = progress(gb)
+    assert cells() != light  # flash is on
+    gb.tick(tuning["HIT_FREEZE_FRAMES"] - 4)  # tap_a already spent ~2 frames
+    assert progress(gb) == p  # still frozen
+    assert cells() != light  # still dark
+
+    gb.tick(8)  # freeze is over
+    assert cells() == light
+    assert progress(gb) != p  # marker is moving again

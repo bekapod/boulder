@@ -11,9 +11,13 @@ def MARKER_PAUSE_FRAMES equ 4
 def BAR_INNER_WIDTH equ 64
 
 def HIT_REWARD equ 10
+def HIT_FREEZE_FRAMES equ 12 ; marker freeze on a hit - the spot flashes this long
+
 def MISS_LIMIT equ 3
-def SLIP_FRAMES equ 30
 def MISS_PENALTY_DIV equ 5 ; a miss costs altitude / 5 (-20%, floor-rounded)
+def MISS_FREEZE_FRAMES equ 4 ; a short stutter so a miss still reads as "registered"
+
+def SLIP_FRAMES equ 30
 def METRES_PER_SPEEDUP equ 10 ; every Xm climbed trims 1 frame off the cycle
 
 def SWEET_SPOT_WIDTH equ 12

@@ -20,6 +20,7 @@ wAltitude: ds 2
 wMissStreak: ds 1 ; counts consecutive misses, 0..3
 wPressUsed: ds 1 ; has a button been pressed in this sweep? 0 = no, 1 = yes
 wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
+wFlashFrames: ds 1 ; counts frames to flash the sweet spot on a hit, 0 = not flashing
 
 export wMarkerDir, wMarkerPos, wCycleFrames, wAltitude, wMissStreak
 
@@ -52,15 +53,38 @@ Play_Init:
   copy [wMissStreak], 0
   copy [wPressUsed], 0
   copy [wSlipCounter], 0
+  copy [wFlashFrames], 0
 
   SwitchState Play_Update, STATE_PLAY
   ret
 
 Play_Update:
+  call UpdateFlash
   call UpdateSlip
   call MoveMarker
   call RenderMarker ; out: b = marker screen position
   call JudgePress ; in: b = marker screen position
+  ret
+
+; count down the sweet-spot flash. while it runs, the three bar tiles
+; under the spot point at the dark variants, back to light when it ends
+; clobbers: a, h, l
+UpdateFlash:
+  ld a, [wFlashFrames]
+  and a, a
+  ret z ; no flash running
+  dec a
+  ld [wFlashFrames], a
+  ld hl, _SCRN0 + BAR_TILE_ROW * 32 + BAR_TILE_COL + 3
+  ld a, TILE_BAR_DARK_FIRST
+  jr nz, .write ; still flashing -> dark set
+  ld a, TILE_BAR_FIRST + 3 ; just hit zero -> light set
+  .write:
+  ld [hli], a
+  inc a
+  ld [hli], a
+  inc a
+  ld [hl], a
   ret
 
 ; lost 1m of altitude every SLIP_FRAMES frames, clamped at 0
@@ -136,6 +160,8 @@ JudgePress:
     adc a, 0
     ld [wAltitude + 1], a
     copy [wMissStreak], 0 ; reset the miss streak
+    copy [wMarkerPause], HIT_FREEZE_FRAMES ; freeze the marker for a few frames
+    copy [wFlashFrames], HIT_FREEZE_FRAMES ; flash the sweet spot for a few frames
     ret
 
   .miss:
@@ -149,6 +175,8 @@ JudgePress:
     ld a, [wAltitude + 1]
     sbc a, d
     ld [wAltitude + 1], a
+
+    copy [wMarkerPause], MISS_FREEZE_FRAMES ; a stutter - the press registered
 
     ; add a miss
     ld a, [wMissStreak]
