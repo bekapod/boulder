@@ -29,7 +29,7 @@ wStateId: ds 1
 
 assert (wInputHeld - wPadInput) == PAD_INPUT_CURRENT
 assert (wInputPressed - wPadInput) == PAD_INPUT_PRESSED
-export wInputHeld, wInputPressed, wStateFn, wStateId
+export wPadInput, wInputHeld, wInputPressed, wStateFn, wStateId
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -52,6 +52,10 @@ MarkerTileData_End:
 BarTileData:
   incbin "bar_bg.chr"
 BarTileData_End:
+
+DigitsTileData:
+  incbin "digits_bg.chr"
+DigitsTileData_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -83,6 +87,11 @@ main:
   ld bc, BarTileData_End - BarTileData
   call MemCopy
 
+  ld hl, DigitsTileData
+  ld de, _VRAM + TILE_DIGIT_FIRST * 16
+  ld bc, DigitsTileData_End - DigitsTileData
+  call MemCopy
+
   ; wipe the boot ROM's leftover Nintendo logo from the tilemap
   ld hl, _SCRN0
   ld d, 0
@@ -95,6 +104,10 @@ main:
   ld [rOBP0], a
   ld a, %00011011
   ld [rOBP1], a
+
+  ; initialise wAltitudeDirty
+  xor a, a
+  ld [wAltitudeDirty], a
 
   ; set the graphics parameters and turn LCD back on
   ld a, LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ8 | LCDCF_OBJON | LCDCF_BGON
@@ -114,6 +127,10 @@ main:
     ; halt wakes on vblank, so this runs at the start of the vblank
     ; window - this is the only safe time to touch OAM
     call hOamDma
+
+    call FlushAltitudeDigits
+    xor a, a
+    ld [wAltitudeDirty], a
 
     UpdatePadInput wPadInput
 

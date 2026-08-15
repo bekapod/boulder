@@ -1,10 +1,29 @@
 if !def(TILES_RGBINC)
 def TILES_RGBINC equ 1
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+include "hardware.rgbinc"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+def BAR_TILE_COL equ 1
+def BAR_TILE_ROW equ 16
+def BAR_WIDTH_TILES equ 9
+
 ; which VRAM tile slots hold which art
 ; slot 0 stays blank b/c empty tilemap cells point at it
 def TILE_MARKER equ 1
 def TILE_BAR_FIRST equ 2
 def TILE_BAR_DARK_FIRST equ TILE_BAR_FIRST + 9 ; dark variants of bar tiles 3..5
+
+def TILE_DIGIT_FIRST equ TILE_BAR_DARK_FIRST + 3
+def TILE_LETTER_M equ TILE_DIGIT_FIRST + 10
+
+def ALTITUDE_MAP_ADDR equ _SCRN0 + 1 * 32 + 15
+
+; the sweet spot sits over these bar tiles (relative to the bar's left tile)
+def FLASH_TILE_OFFSET equ 3
+def FLASH_TILE_COUNT equ 3
 
 endc

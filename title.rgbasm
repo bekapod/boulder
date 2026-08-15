@@ -9,8 +9,7 @@ Title_Init:
   ret
 
 Title_Update:
-  ld a, [wInputPressed]
-  and a, PADF_START
+  TestPadInput_Pressed wPadInput, PADF_START
   ret nz
   SwitchState Play_Init, STATE_PLAY
   ret

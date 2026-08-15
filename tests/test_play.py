@@ -4,11 +4,35 @@ from helpers import (
     enter_play,
     miss_once,
     next_sweep,
+    parse_rgbinc,
     progress,
     screen_pos,
     tap_a,
     tick_until,
 )
+
+_TILES = parse_rgbinc("tiles.rgbinc")
+DIGITS = _TILES["ALTITUDE_MAP_ADDR"]
+TILE_DIGIT_FIRST = _TILES["TILE_DIGIT_FIRST"]
+TILE_LETTER_M = _TILES["TILE_LETTER_M"]
+BLANK = 0
+
+
+def digit_cells(gb):
+    return [gb.pyboy.memory[DIGITS + i] for i in range(3)]
+
+
+def expected_cells(altitude):
+    """The three tile indices the screen should show for this altitude."""
+    altitude = min(altitude, 999)
+    hundreds, rest = divmod(altitude, 100)
+    tens, ones = divmod(rest, 10)
+
+    return [
+        BLANK if hundreds == 0 else TILE_DIGIT_FIRST + hundreds,
+        BLANK if hundreds == 0 and tens == 0 else TILE_DIGIT_FIRST + tens,
+        TILE_DIGIT_FIRST + ones,
+    ]
 
 
 def test_perfect_press_rewards_and_forgives(gb, states, tuning):
@@ -42,7 +66,16 @@ def test_three_misses_end_the_game(gb, states, tuning):
             assert gb.state == states["STATE_PLAY"]
 
     assert gb.state == states["STATE_GAMEOVER"]
+
+    final = gb.read16("wAltitude")
+    assert 0 < final < 47  # penalties + slip bled it, but it wasn't zeroed
+    assert digit_cells(gb) == expected_cells(final)
+
+    # replaying resets it
+    gb.press("start")
+    assert gb.state == states["STATE_PLAY"]
     assert gb.read16("wAltitude") == 0
+    assert digit_cells(gb) == expected_cells(0)
 
 
 def test_slip_bleeds_but_never_kills(gb, states, tuning):
@@ -117,7 +150,12 @@ def test_pause_presses_are_ignored(gb, states, tuning):
 
 def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
     """a hit halts the marker and darkens the spot, both for HIT_FREEZE_FRAMES."""
-    SPOT = 0x9800 + 16 * 32 + 4  # tilemap: bar row, cells 4..6
+    SPOT = (
+        _TILES["_SCRN0"]
+        + _TILES["BAR_TILE_ROW"] * 32
+        + _TILES["BAR_TILE_COL"]
+        + _TILES["FLASH_TILE_OFFSET"]
+    )
 
     def cells():
         return [gb.pyboy.memory[SPOT + i] for i in range(3)]
@@ -138,3 +176,18 @@ def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
     gb.tick(8)  # freeze is over
     assert cells() == light
     assert progress(gb) != p  # marker is moving again
+
+
+def test_altitude_display_tracks_memory(gb, states):
+    """set wAltitude to a value and check the screen shows the right digits."""
+    enter_play(gb, states)
+    assert digit_cells(gb) == expected_cells(0)
+    assert gb.pyboy.memory[DIGITS + 3] == TILE_LETTER_M
+
+    for setted in (8, 100, 247, 5000):
+        gb.set16("wAltitude", setted)
+        tick_until(
+            gb, lambda: gb.read16("wAltitude") == setted - 1, 40, "slip republish"
+        )
+        gb.tick(2)  # the dirty flag raised mid-frame delivers at the next vblank
+        assert digit_cells(gb) == expected_cells(setted - 1)
