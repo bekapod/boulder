@@ -15,7 +15,7 @@ def _hook_sweep_ends(gb) -> tuple[list[int], list[tuple[str, int]]]:
 
     gb.pyboy.hook_register(
         None,
-        "Play_Update.sweep_ended",
+        "MoveMarker.sweep_ended",
         on_end,
         None,
     )
@@ -54,14 +54,16 @@ def test_sweep_period_is_cycle_plus_pause(gb, tuning):
     )
 
 
-def test_sweep_speed_follows_cycle_byte(gb, tuning):
+def test_sweep_speed_follows_altitude(gb, tuning):
     fast_cycle = 10
+    altitude = (tuning["CYCLE_FRAMES"] - fast_cycle + 1) * tuning[
+        "METRES_PER_SPEEDUP"
+    ] - 1
     fast_period = fast_cycle + tuning["MARKER_PAUSE_FRAMES"]
     slow_period = tuning["CYCLE_FRAMES"] + tuning["MARKER_PAUSE_FRAMES"]
 
     gb.press("start")
-    _bank, cycle_addr = gb.pyboy.symbol_lookup("wCycleFrames")
-    gb.pyboy.memory[cycle_addr] = fast_cycle
+    gb.set16("wAltitude", altitude)
 
     clock, ends = _hook_sweep_ends(gb)
     _run(gb, clock, slow_period + (MEASURED_SWEEPS + 2) * fast_period)

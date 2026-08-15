@@ -16,8 +16,12 @@ wMarkerDir: ds 1
 wMarkerPos: ds 2 ; 8.8 fixed-point: +0 = fraction, +1 = whole pixels
 wMarkerPause: ds 1
 wCycleFrames: ds 1
+wAltitude: ds 2
+wMissStreak: ds 1 ; counts consecutive misses, 0..3
+wPressUsed: ds 1 ; has a button been pressed in this sweep? 0 = no, 1 = yes
+wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
 
-export wMarkerDir, wMarkerPos, wCycleFrames
+export wMarkerDir, wMarkerPos, wCycleFrames, wAltitude, wMissStreak
 
 section "play", rom0
 Play_Init:
@@ -43,17 +47,175 @@ Play_Init:
   copy [wMarkerPos + 1], 0
   copy [wMarkerPause], 0
   copy [wCycleFrames], CYCLE_FRAMES
+  copy [wAltitude], 0
+  copy [wAltitude + 1], 0
+  copy [wMissStreak], 0
+  copy [wPressUsed], 0
+  copy [wSlipCounter], 0
 
   SwitchState Play_Update, STATE_PLAY
   ret
 
 Play_Update:
+  call UpdateSlip
+  call MoveMarker
+  call RenderMarker ; out: b = marker screen position
+  call JudgePress ; in: b = marker screen position
+  ret
+
+; lost 1m of altitude every SLIP_FRAMES frames, clamped at 0
+; clobbers: a, b
+UpdateSlip:
+  ld a, [wSlipCounter]
+  inc a
+  ld [wSlipCounter], a
+  cp a, SLIP_FRAMES
+  ret c ; not time yet
+  copy [wSlipCounter], 0
+  ld a, [wAltitude] ; is altitude 0?
+  ld b, a
+  ld a, [wAltitude + 1]
+  or a, b ; 0 only if low or high has no bits at all
+  ret z ; already at the bottom -> clamp
+  ld a, [wAltitude]
+  sub a, 1
+  ld [wAltitude], a
+  ld a, [wAltitude + 1]
+  sbc a, 0
+  ld [wAltitude + 1], a
+  ret
+
+; how many times does c fit into wAltitude? (division by repeated subtraction)
+; in: c = divisor
+; out: de = quotient
+; clobbers: a, h, l
+DivAltitude:
+  ld a, [wAltitude]
+  ld l, a
+  ld a, [wAltitude + 1]
+  ld h, a
+  ld de, 0
+  .fit:
+    ld a, l ; hl = hl - c, 16-bit subtract: low byte first
+    sub a, c
+    ld l, a
+    ld a, h
+    sbc a, 0 ; high byte pays the borrow
+    ld h, a
+    ret c ; borrowed past zero -> didn't fit
+    inc de
+    jr .fit
+
+; judge one A press per sweep against the sweet spot
+; note: presses during the endpoint pause are ignored
+; in: b = marker screen position in bar pixels (0..BAR_INNER_WIDTH)
+; clobbers: a, b, c, d, e
+JudgePress:
+  ld a, [wMarkerPause]
+  and a, a
+  ret nz ; frozen at an endpoint -> no judgment this frame
+
+  ld a, [wInputPressed]
+  and a, PADF_A
+  ret nz ; A wasn't pressed this frame -> nothing to judge
+  ld a, [wPressUsed]
+  and a, a
+  ret nz ; this sweep already judged -> extra presses ignored
+  copy [wPressUsed], 1 ; mark that a press has been used for this sweep
+  ld a, b ; b = marker's screen position
+  cp a, SWEET_SPOT_MIN
+  jr c, .miss ; marker was left of the spot
+  cp a, SWEET_SPOT_MAX + 1
+  jr nc, .miss ; marker was right of the spot
+
+  .hit:
+    ld a, [wAltitude] ; 16-bit add: low byte first
+    add a, HIT_REWARD
+    ld [wAltitude], a
+    ld a, [wAltitude + 1] ; then let the carry spill into high byte
+    adc a, 0
+    ld [wAltitude + 1], a
+    copy [wMissStreak], 0 ; reset the miss streak
+    ret
+
+  .miss:
+    ld c, MISS_PENALTY_DIV
+    call DivAltitude ; de = penalty = altitude / 5
+
+    ; altitude = altitude - penalty
+    ld a, [wAltitude]
+    sub a, e
+    ld [wAltitude], a
+    ld a, [wAltitude + 1]
+    sbc a, d
+    ld [wAltitude + 1], a
+
+    ; add a miss
+    ld a, [wMissStreak]
+    inc a
+    ld [wMissStreak], a
+    cp a, MISS_LIMIT
+    ret c ; streak < 3 -> survive
+    ; three misses in a row -> game over
+    copy [wAltitude], 0
+    copy [wAltitude + 1], 0
+    SwitchState GameOver_Init, STATE_GAMEOVER
+    ret
+
+; move the marker sprite to match wMarkerPos/wMarkerDir
+; out: b = marker screen position in bar pixels (0..BAR_INNER_WIDTH)
+; clobbers: a
+RenderMarker:
+  ; round progress to whole pixels: carry = "fraction >= 0.5"
+  ld a, [wMarkerPos]
+  add a, 128
+  ld a, [wMarkerPos + 1]
+  adc a, 0 ; a = 0..BAR_INNER_WIDTH whole pixels of progress
+  ld b, a
+  ld a, [wMarkerDir]
+  and a, a
+  jr z, .from_left ; dir 0: progress measures from the left
+  ld a, BAR_INNER_WIDTH ; dir 1: mirror it, measure from the right
+  sub a, b
+  ld b, a
+  .from_left:
+  ld a, b
+  add a, MARKER_OAM_X_BASE
+  ld [wShadowOAM + OAMA_X], a
+  ret
+
+; wCycleFrames = CYCLE_FRAMES - altitude / METRES_PER_SPEEDUP,
+; floored at MARKER_CYCLE_MIN; recomputed from altitude
+; clobbers: a, c, d, e, h, l
+RecomputeCycle:
+  ld c, METRES_PER_SPEEDUP
+  call DivAltitude ; de = altitude / METRES_PER_SPEEDUP
+  ld a, d
+  and a, a
+  jr nz, .floor ; quotient > 255 -> miles past the floor
+  ld a, e
+  cp a, CYCLE_FRAMES - MARKER_CYCLE_MIN + 1
+  jr c, .keep ; quotient <= 56 -> inside the allowed range
+  .floor:
+  ld e, CYCLE_FRAMES - MARKER_CYCLE_MIN
+  .keep:
+  ld a, CYCLE_FRAMES
+  sub a, e
+  ld [wCycleFrames], a
+  ret
+
+; tick the endpoint pause or advance the marker one frame; at the
+; end of a sweep: reset, re-speed, turn around, start the pause
+; clobbers: a, b, c, d, e, h, l
+MoveMarker:
+  ; pause check
   ld a, [wMarkerPause] ; 0 = not pausing, else frames left to wait
   and a, a ; zero-test, nothing changes in a but it sets flags as side-effect, zero flag is now "was a zero?"
   jr z, .not_paused
   dec a
   ld [wMarkerPause], a ; decrement by one frame and re-store
-  jr .render ; frozen: skip movement but still draw
+  ret ; frozen: skip movement but still draw
+
   .not_paused:
   ld a, [wCycleFrames]
 
@@ -78,38 +240,19 @@ Play_Update:
   adc a, d
   ld [wMarkerPos + 1], a
   cp a, BAR_INNER_WIDTH
-  jr c, .render
+  ret c
   .sweep_ended: ; restart progress for the next sweep and turn around
     copy [wMarkerPos], 0
     copy [wMarkerPos + 1], 0
+    copy [wPressUsed], 0 ; reset the press-used flag for the next sweep
+
+    call RecomputeCycle
+
     ld a, [wMarkerDir]
     xor a, 1 ; flip 0 <-> 1
     ld [wMarkerDir], a
     copy [wMarkerPause], MARKER_PAUSE_FRAMES
-
-  .render:
-    ; round progress to whole pixels: carry = "fraction >= 0.5"
-    ld a, [wMarkerPos]
-    add a, 128
-    ld a, [wMarkerPos + 1]
-    adc a, 0 ; a = 0..BAR_INNER_WIDTH whole pixels of progress
-    ld b, a
-    ld a, [wMarkerDir]
-    and a, a
-    jr z, .from_left ; dir 0: progress measures from the left
-    ld a, BAR_INNER_WIDTH ; dir 1: mirror it, measure from the right
-    sub a, b
-    ld b, a
-    .from_left:
-    ld a, b
-    add a, MARKER_OAM_X_BASE
-    ld [wShadowOAM + OAMA_X], a
-
-  ld a, [wInputPressed]
-  and a, PADF_START
-  ret nz
-  SwitchState GameOver_Init, STATE_GAMEOVER
-  ret
+    ret
 
 ; each entry is "to cross the bar's inner width in CYCLE frames
 ; how much do I add per frame?

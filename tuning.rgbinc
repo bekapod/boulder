@@ -10,4 +10,14 @@ def MARKER_PAUSE_FRAMES equ 4
 
 def BAR_INNER_WIDTH equ 64
 
+def HIT_REWARD equ 10
+def MISS_LIMIT equ 3
+def SLIP_FRAMES equ 30
+def MISS_PENALTY_DIV equ 5 ; a miss costs altitude / 5 (-20%, floor-rounded)
+def METRES_PER_SPEEDUP equ 10 ; every Xm climbed trims 1 frame off the cycle
+
+def SWEET_SPOT_WIDTH equ 12
+def SWEET_SPOT_MIN equ (BAR_INNER_WIDTH - SWEET_SPOT_WIDTH) / 2
+def SWEET_SPOT_MAX equ SWEET_SPOT_MIN + SWEET_SPOT_WIDTH - 1
+
 endc

@@ -8,6 +8,7 @@ Any symbol a test reads must be `export`ed in the rgbasm source.
 import re
 from pathlib import Path
 
+import helpers
 import pytest
 from pyboy import PyBoy
 
@@ -42,6 +43,16 @@ class Harness:
         self.pyboy.button(button)
         self.tick(SETTLE_FRAMES)
 
+    def read16(self, symbol: str) -> int:
+        """Read a little-endian 16-bit WRAM value by symbol name."""
+        a = self.pyboy.symbol_lookup(symbol)[1]
+        return self.pyboy.memory[a] | (self.pyboy.memory[a + 1] << 8)
+
+    def set16(self, symbol: str, value: int) -> None:
+        a = self.pyboy.symbol_lookup(symbol)[1]
+        self.pyboy.memory[a] = value & 0xFF
+        self.pyboy.memory[a + 1] = value >> 8
+
     @property
     def state(self) -> int:
         return self.read("wStateId")
@@ -51,18 +62,17 @@ class Harness:
 def states() -> dict[str, int]:
     """STATE_* ids parsed from utils.rgbinc (equ constants aren't in the .sym)."""
     src = (ROOT / "utils.rgbinc").read_text()
-    found = {m[0]: int(m[1]) for m in re.findall(r"(?m)^def (STATE_\w+) equ (\d+)", src)}
+    found = {
+        m[0]: int(m[1]) for m in re.findall(r"(?m)^def (STATE_\w+) equ (\d+)", src)
+    }
     assert found, "no STATE_* constants found in utils.rgbinc"
     return found
 
 
 @pytest.fixture(scope="session")
 def tuning() -> dict[str, int]:
-    """Gameplay-feel constants parsed from tuning.rgbinc."""
-    src = (ROOT / "tuning.rgbinc").read_text()
-    found = {m[0]: int(m[1]) for m in re.findall(r"(?m)^def (\w+) equ (\d+)", src)}
-    assert found, "no constants found in tuning.rgbinc"
-    return found
+    """Gameplay-feel constants parsed from tuning.rgbinc (see helpers.tuning)."""
+    return helpers.tuning()
 
 
 @pytest.fixture
