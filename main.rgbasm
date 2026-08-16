@@ -26,10 +26,11 @@ wInputPressed: ds 1
                ds 1   ; PAD_INPUT_RELEASED (private)
 wStateFn: ds 2
 wStateId: ds 1
+wVblankFn: ds 2 ; per-state vblank hook, see SetVblankFn
 
 assert (wInputHeld - wPadInput) == PAD_INPUT_CURRENT
 assert (wInputPressed - wPadInput) == PAD_INPUT_PRESSED
-export wPadInput, wInputHeld, wInputPressed, wStateFn, wStateId
+export wPadInput, wInputHeld, wInputPressed, wStateFn, wStateId, wVblankFn
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -107,10 +108,6 @@ main:
   ld a, %00011011
   ld [rOBP1], a
 
-  ; initialise wAltitudeDirty
-  xor a, a
-  ld [wAltitudeDirty], a
-
   ; set the graphics parameters and turn LCD back on
   ld a, LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ8 | LCDCF_OBJON | LCDCF_BGON
   ld [rLCDC], a
@@ -119,6 +116,7 @@ main:
   ld a, IEF_VBLANK
   ld [rIE], a
 
+  SetVblankFn VblankNop
   SwitchState Title_Init, STATE_TITLE
 
   ei
@@ -132,9 +130,13 @@ main:
 
     call Sfx_Tick
 
-    call FlushAltitudeDigits
-    xor a, a
-    ld [wAltitudeDirty], a
+    ; per-state vblank work (tilemap flushes, etc), still inside
+    ; the vblank window
+    ld a, [wVblankFn]
+    ld l, a
+    ld a, [wVblankFn + 1]
+    ld h, a
+    call CallHL
 
     UpdatePadInput wPadInput
 
@@ -170,7 +172,17 @@ main:
     ld bc, OAM_COUNT * sizeof_OAM_ATTRS
     jp MemSet ; tail call, MemSet's own ret returns back to caller
 
-export ClearShadowOAM
+  ; jump to the routine that hl points to. "call hl" doesn't exist as an
+  ; instruction, so we call here and immediately jump to hl
+  ; the hook's own ret then returns to whoever called it
+  CallHL:
+    jp hl
+
+  ; the vblank hook for states with no vblank work
+  VblankNop:
+    ret
+
+export ClearShadowOAM, VblankNop
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

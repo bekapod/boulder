@@ -58,6 +58,7 @@ Play_Init:
   copy [wFlashFrames], 0
 
   call UpdateAltitudeDisplay
+  SetVblankFn Play_Vblank
 
   SwitchState Play_Update, STATE_PLAY
   ret
@@ -353,6 +354,11 @@ MoveMarker:
     ld [wMarkerDir], a
     copy [wMarkerPause], MARKER_PAUSE_FRAMES
     ret
+
+; all of play's vblank window work, runs right after OAM DMA
+; VBLANK ONLY
+Play_Vblank:
+  jp FlushAltitudeDigits ; tail call
 
 ; copy the digit cells to the tilemap if they changed since last flush
 ; VBLANK ONLY

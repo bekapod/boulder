@@ -132,6 +132,14 @@ macro SwitchState
   copy [wStateId], \2
 endm
 
+; point the per-state vblank hook at routine \1
+; the hook runs at the top of every vblank, right after OAM DMA
+; expected to be called from a state's Init
+macro SetVblankFn
+  copy [wVblankFn], low(\1)
+  copy [wVblankFn + 1], high(\1)
+endm
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; LCD
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
