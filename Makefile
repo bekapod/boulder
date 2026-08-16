@@ -31,6 +31,10 @@ $(BUILD):
 test: $(BUILD)/$(ROM_NAME).gb
 	uv run --project tests pytest tests
 
+.PHONY: sweep
+sweep: $(BUILD)/$(ROM_NAME).gb
+	uv run --project tests python tests/sweep.py
+
 .PHONY: clean
 clean:
 	rm -rf $(BUILD)

@@ -6,22 +6,14 @@ Any symbol a test reads must be `export`ed in the rgbasm source.
 """
 
 import re
-from pathlib import Path
 
 import helpers
 import pytest
 from pyboy import PyBoy
 
-ROOT = Path(__file__).resolve().parent.parent
-ROM = ROOT / "build" / "boulder.gb"
-SYM = ROOT / "build" / "boulder.sym"
-
-# Upper bound on boot ROM (~70 frames) + our init before we call the ROM broken.
-BOOT_CAP_FRAMES = 600
-
-# Frames to run after an input so the update + the new state's init
-# have both executed.
-SETTLE_FRAMES = 4
+ROOT = helpers.ROOT
+ROM = helpers.ROM
+SYM = helpers.SYM
 
 
 class Harness:
@@ -41,7 +33,7 @@ class Harness:
     def press(self, button: str) -> None:
         """Tap a button for one frame and let the game react."""
         self.pyboy.button(button)
-        self.tick(SETTLE_FRAMES)
+        self.tick(helpers.SETTLE_FRAMES)
 
     def read16(self, symbol: str) -> int:
         """Read a little-endian 16-bit WRAM value by symbol name."""
@@ -89,20 +81,6 @@ def gb():
         no_input=True,
     )
     harness = Harness(pyboy)
-    _wait_for_boot(harness)
+    helpers.wait_for_boot(pyboy)
     yield harness
     pyboy.stop(save=False)
-
-
-def _wait_for_boot(harness: Harness) -> None:
-    """Tick past PyBoy's ~70-frame boot ROM until Title_Update executes,
-    proving init is done and input polling has started."""
-    pyboy = harness.pyboy
-    booted = []
-    pyboy.hook_register(None, "Title_Update", lambda _: booted.append(True), None)
-    for _ in range(BOOT_CAP_FRAMES):
-        harness.tick(1)
-        if booted:
-            pyboy.hook_deregister(None, "Title_Update")
-            return
-    pytest.fail(f"ROM did not reach the main loop within {BOOT_CAP_FRAMES} frames")
