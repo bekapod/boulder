@@ -47,10 +47,7 @@ def addr(gb, symbol: str) -> int:
 
 
 def screen_pos(gb) -> int:
-    pos = gb.pyboy.memory[addr(gb, "wMarkerPos") + 1]
-    if gb.read("wMarkerDir"):
-        pos = BAR_INNER_WIDTH - pos
-    return pos
+    return gb.read("wMarkerScreenPos")
 
 
 def progress(gb) -> int:

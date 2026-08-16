@@ -11,14 +11,16 @@ def MARKER_OAM_Y equ BAR_TILE_ROW * 8 + 5 + 16 ; 5 = 8px row minus 3px overlap i
 section "play_ram", wram0
 wMarkerDir: ds 1
 wMarkerPos: ds 2 ; 8.8 fixed-point: +0 = fraction, +1 = whole pixels
+wMarkerScreenPos: ds 1 ; bar pixels 0..BAR_INNER_WIDTH, published by RenderMarker
 wMarkerPause: ds 1
 wCycleFrames: ds 1
 wMissStreak: ds 1 ; counts consecutive misses, 0..3
 wPressUsed: ds 1 ; has a button been pressed in this sweep? 0 = no, 1 = yes
 wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
 wFlashFrames: ds 1 ; counts frames to flash the sweet spot on a hit, 0 = not flashing
+wFlashPending: ds 1 ; tile id to paint at the spot next vblank, 0 = nothing queued
 
-export wMarkerDir, wMarkerPos, wCycleFrames, wMissStreak
+export wMarkerDir, wMarkerPos, wMarkerScreenPos, wCycleFrames, wMissStreak
 
 section "play", rom0
 Play_Init:
@@ -44,12 +46,14 @@ Play_Init:
   copy [wMarkerDir], 0 ; 0 = moving right, 1 = moving left
   copy [wMarkerPos], 0
   copy [wMarkerPos + 1], 0
+  copy [wMarkerScreenPos], 0
   copy [wMarkerPause], 0
   copy [wCycleFrames], CYCLE_FRAMES
   copy [wMissStreak], 0
   copy [wPressUsed], 0
   copy [wSlipCounter], 0
   copy [wFlashFrames], 0
+  copy [wFlashPending], 0
 
   SetVblankFn Play_Vblank
 
@@ -60,29 +64,21 @@ Play_Update:
   call UpdateFlash
   call UpdateSlip
   call MoveMarker
-  call RenderMarker ; out: b = marker screen position
-  call JudgePress ; in: b = marker screen position
+  call RenderMarker ; publishes wMarkerScreenPos
+  call JudgePress
   ret
 
-; count down the sweet-spot flash. while it runs, the three bar tiles
-; under the spot point at the dark variants, back to light when it ends
-; clobbers: a, h, l
+; count down the sweet-spot flash. the hit queued the dark tiles
+; when the countdown ends, queue the light ones back
+; clobbers: a
 UpdateFlash:
   ld a, [wFlashFrames]
   and a, a
   ret z ; no flash running
   dec a
   ld [wFlashFrames], a
-  ld hl, _SCRN0 + BAR_TILE_ROW * 32 + BAR_TILE_COL + FLASH_TILE_OFFSET
-  ld a, TILE_BAR_DARK_FIRST
-  jr nz, .write ; still flashing -> dark set
-  ld a, TILE_BAR_FIRST + FLASH_TILE_OFFSET ; just hit zero -> light set
-  .write:
-  ld [hli], a
-  inc a
-  ld [hli], a
-  inc a
-  ld [hl], a
+  ret nz ; still flashing, dark tiles already on screen
+  copy [wFlashPending], TILE_BAR_FIRST + FLASH_TILE_OFFSET ; queue the light set
   ret
 
 ; lost 1m of altitude every SLIP_FRAMES frames, clamped at 0
@@ -104,7 +100,6 @@ UpdateSlip:
 
 ; judge one A press per sweep against the sweet spot
 ; note: presses during the endpoint pause are ignored
-; in: b = marker screen position in bar pixels (0..BAR_INNER_WIDTH)
 ; clobbers: a, b, c, d, e, h, l
 JudgePress:
   ld a, [wMarkerPause]
@@ -117,7 +112,7 @@ JudgePress:
   and a, a
   ret nz ; this sweep already judged -> extra presses ignored
   copy [wPressUsed], 1 ; mark that a press has been used for this sweep
-  ld a, b ; b = marker's screen position
+  ld a, [wMarkerScreenPos]
   cp a, SWEET_SPOT_MIN
   jr c, .miss ; marker was left of the spot
   cp a, SWEET_SPOT_MAX + 1
@@ -127,6 +122,7 @@ JudgePress:
     copy [wMissStreak], 0 ; reset the miss streak
     copy [wMarkerPause], HIT_FREEZE_FRAMES ; freeze the marker for a few frames
     copy [wFlashFrames], HIT_FREEZE_FRAMES ; flash the sweet spot for a few frames
+    copy [wFlashPending], TILE_BAR_DARK_FIRST ; queue the dark set for vblank
     ld a, SFX_CHIME
     call Sfx_Play
     ld de, HIT_REWARD
@@ -148,8 +144,8 @@ JudgePress:
     ret
 
 ; move the marker sprite to match wMarkerPos/wMarkerDir
-; out: b = marker screen position in bar pixels (0..BAR_INNER_WIDTH)
-; clobbers: a
+; publishes wMarkerScreenPos
+; clobbers: a, b
 RenderMarker:
   ; round progress to whole pixels: carry = "fraction >= 0.5"
   ld a, [wMarkerPos]
@@ -165,6 +161,7 @@ RenderMarker:
   ld b, a
   .from_left:
   ld a, b
+  ld [wMarkerScreenPos], a ; publish before converting to an OAM coordinate
   add a, MARKER_OAM_X_BASE
   ld [wShadowOAM + OAMA_X], a
   ret
@@ -242,7 +239,25 @@ MoveMarker:
 ; all of play's vblank window work, runs right after OAM DMA
 ; VBLANK ONLY
 Play_Vblank:
+  call FlushFlashTiles
   jp Altitude_Flush ; tail call
+
+; paint the queued sweet-spot tile set (dark or light), if any
+; VBLANK ONLY
+; clobbers: a, h, l
+FlushFlashTiles:
+  ld a, [wFlashPending]
+  and a, a
+  ret z
+  ld hl, _SCRN0 + BAR_TILE_ROW * 32 + BAR_TILE_COL + FLASH_TILE_OFFSET
+  ld [hli], a
+  inc a
+  ld [hli], a
+  inc a
+  ld [hl], a
+  xor a, a
+  ld [wFlashPending], a
+  ret
 
 ; each entry is "to cross the bar's inner width in CYCLE frames
 ; how much do I add per frame?
