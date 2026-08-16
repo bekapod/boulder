@@ -6,16 +6,18 @@ def SFX_END equ $ff
 def SFX_CHIME equ 0
 def SFX_THUD equ 1
 def SFX_TRIGGER equ %10000000 ; bit 7 of NRx4 - (re)start the channel
+; per-channel effect state
+rsreset
+def SFX_CH_PTR rb 2 ; next unexecuted row, low byte first, $0000 = idle
+def SFX_CH_DELAY rb 1 ; frames until the row at ptr fires
+def sizeof_SFX_CH rb 0
 
 export SFX_CHIME, SFX_THUD
 
 section "sfx_ram", wram0
 ; per-channel cursor into the running effect script
-; ptr = next unexecuted row, $0000 = channel idle
-wSfxCh2Ptr: ds 2
-wSfxCh2Delay: ds 1 ; frames until that row fires
-wSfxCh4Ptr: ds 2
-WSfxCh4Delay: ds 1
+wSfxCh2: ds sizeof_SFX_CH
+wSfxCh4: ds sizeof_SFX_CH
 
 section "sfx", rom0
 
@@ -31,10 +33,10 @@ Sfx_Init:
 
   ; both channels start idle
   xor a, a
-  ld [wSfxCh2Ptr], a
-  ld [wSfxCh2Ptr + 1], a
-  ld [wSfxCh4Ptr], a
-  ld [wSfxCh4Ptr + 1], a
+  ld [wSfxCh2 + SFX_CH_PTR], a
+  ld [wSfxCh2 + SFX_CH_PTR + 1], a
+  ld [wSfxCh4 + SFX_CH_PTR], a
+  ld [wSfxCh4 + SFX_CH_PTR + 1], a
   ret
 
 export Sfx_Init
@@ -42,12 +44,12 @@ export Sfx_Init
 ; advance both channels' running effects by one frame
 ; called once per frame from main's loop
 Sfx_Tick:
-  ld hl, wSfxCh2Ptr
+  ld hl, wSfxCh2
   call Sfx_TickChannel
-  ld hl, wSfxCh4Ptr
+  ld hl, wSfxCh4
   ; fall through into a tail call
 
-; advance one channel: hl = channel state (ptr lo, ptr hi, delay)
+; advance one channel: hl = channel state (an SFX_CH struct)
 ; the delay counter always means "frames until the row at ptr fires"
 Sfx_TickChannel:
   ld a, [hl+] ; ptr low, loads and bumps hl
@@ -128,8 +130,8 @@ Sfx_Play:
 export Sfx_Play
 
 SfxTable:
-  dw ChimeScript, wSfxCh2Ptr ; SFX_CHIME
-  dw ThudScript, wSfxCh4Ptr ; SFX_THUD
+  dw ChimeScript, wSfxCh2 ; SFX_CHIME
+  dw ThudScript, wSfxCh4 ; SFX_THUD
 
 ; hit chime: stuttered slide up - each step retriggers
 ; fast envelope pulses between steps

@@ -5,7 +5,7 @@ include "utils.rgbinc"
 def MARKER_WIDTH equ 8
 def MARKER_TIP equ MARKER_WIDTH / 2
 ; bar tile x + border + OAM offset
-def MARKER_OAM_X_BASE equ BAR_TILE_COL * 8 + 4 + 8 - MARKER_TIP
+def MARKER_OAM_X_BASE equ BAR_TILE_COL * 8 + BAR_BORDER_PX + 8 - MARKER_TIP
 def MARKER_OAM_Y equ BAR_TILE_ROW * 8 + 5 + 16 ; 5 = 8px row minus 3px overlap into the bar
 
 section "play_ram", wram0
@@ -129,8 +129,8 @@ JudgePress:
     jp Altitude_Add
 
   .miss:
-  ld a, SFX_THUD
-  call Sfx_Play
+    ld a, SFX_THUD
+    call Sfx_Play
     ld c, MISS_PENALTY_DIV
     call DivAltitude ; de = penalty = altitude / 5
     call Altitude_Sub ; charge it and republish

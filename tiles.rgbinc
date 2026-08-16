@@ -4,9 +4,11 @@ def TILES_RGBINC equ 1
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 include "hardware.rgbinc"
+include "tuning.rgbinc"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+def BAR_BORDER_PX equ 4 ; border cap in the bar art before track pixel 0
 def BAR_TILE_COL equ 1
 def BAR_TILE_ROW equ 16
 def BAR_WIDTH_TILES equ 9
@@ -25,5 +27,15 @@ def ALTITUDE_MAP_ADDR equ _SCRN0 + 1 * 32 + 15
 ; the sweet spot sits over these bar tiles (relative to the bar's left tile)
 def FLASH_TILE_OFFSET equ 3
 def FLASH_TILE_COUNT equ 3
+
+; tripwires: the flash tiles must be exactly the tiles the sweet spot
+; covers. the spot is in bar-track pixels. + BAR_BORDER_PX converts to
+; pixels within the bar tiles, / 8 converts pixels to a tile index
+assert FLASH_TILE_OFFSET == (SWEET_SPOT_MIN + BAR_BORDER_PX) / 8, \
+  "FLASH_TILE_OFFSET no longer matches SWEET_SPOT_MIN"
+assert FLASH_TILE_COUNT == (SWEET_SPOT_MAX + BAR_BORDER_PX) / 8 - FLASH_TILE_OFFSET + 1, \
+  "FLASH_TILE_COUNT no longer covers the sweet spot"
+assert FLASH_TILE_COUNT == 3, \
+  "the dark bar art and FlushFlashTiles' unrolled writes assume 3 tiles"
 
 endc
