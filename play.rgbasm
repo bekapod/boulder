@@ -13,15 +13,12 @@ wMarkerDir: ds 1
 wMarkerPos: ds 2 ; 8.8 fixed-point: +0 = fraction, +1 = whole pixels
 wMarkerPause: ds 1
 wCycleFrames: ds 1
-wAltitude: ds 2
 wMissStreak: ds 1 ; counts consecutive misses, 0..3
 wPressUsed: ds 1 ; has a button been pressed in this sweep? 0 = no, 1 = yes
 wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
 wFlashFrames: ds 1 ; counts frames to flash the sweet spot on a hit, 0 = not flashing
-wAltitudeDigits: ds 3 ; hundreds, tens, ones, blank-padded
-wAltitudeDirty: ds 1 ; 0 = no change, 1 = update the display
 
-export wMarkerDir, wMarkerPos, wCycleFrames, wAltitude, wMissStreak, wAltitudeDigits, wAltitudeDirty
+export wMarkerDir, wMarkerPos, wCycleFrames, wMissStreak
 
 section "play", rom0
 Play_Init:
@@ -37,8 +34,7 @@ Play_Init:
     cp a, TILE_BAR_FIRST + BAR_WIDTH_TILES
     jr nz, .draw_bar
 
-  ld a, TILE_LETTER_M
-  ld [ALTITUDE_MAP_ADDR + 3], a
+  call Altitude_Init
 
   call ClearShadowOAM
   copy [wShadowOAM + OAMA_Y], MARKER_OAM_Y
@@ -50,14 +46,11 @@ Play_Init:
   copy [wMarkerPos + 1], 0
   copy [wMarkerPause], 0
   copy [wCycleFrames], CYCLE_FRAMES
-  copy [wAltitude], 0
-  copy [wAltitude + 1], 0
   copy [wMissStreak], 0
   copy [wPressUsed], 0
   copy [wSlipCounter], 0
   copy [wFlashFrames], 0
 
-  call UpdateAltitudeDisplay
   SetVblankFn Play_Vblank
 
   SwitchState Play_Update, STATE_PLAY
@@ -108,115 +101,6 @@ UpdateSlip:
   ret z ; already at the bottom -> clamp, don't wrap
   ld de, 1
   jp Altitude_Sub
-
-; how many times does c fit into wAltitude? (division by repeated subtraction)
-; in: c = divisor
-; out: de = quotient, hl = remainder
-; clobbers: a, d, e, h, l
-DivAltitude:
-  ld a, [wAltitude]
-  ld l, a
-  ld a, [wAltitude + 1]
-  ld h, a
-  ; no jump, execution continues into Div16by8 below
-
-; hl / c -> de = quotient, hl = remainder (0..c-1)
-; clobbers: a
-Div16by8:
-  ld de, 0
-  .fit:
-    ld a, l ; hl = hl - c, 16-bit subtract: low byte first
-    sub a, c
-    ld l, a
-    ld a, h
-    sbc a, 0 ; high byte pays the borrow
-    ld h, a
-    jr c, .undo ; borrowed past zero -> didn't fit
-    inc de
-    jr .fit
-  .undo: ; add c back so hl holds the real leftover
-    ld a, l
-    add a, c
-    ld l, a
-    ld a, h
-    adc a, 0 ; and the carry un-pays the borrow -> h back to 0
-    ld h, a
-  ret
-
-; rebuild wAltitudeDigits from wAltitude and raise the dirty flag
-; blank-padded, display clamps at 999
-; clobbers: a, b, c, h, l
-UpdateAltitudeDisplay:
-  ld a, [wAltitude]
-  ld l, a
-  ld a, [wAltitude + 1]
-  ld h, a
-  ld a, h
-  cp a, high(1000)
-  jr c, .no_clamp ; high byte below $03 -> at most 767, fine
-  jr nz, .clamp ; high byte above $03 -> 1024+, clamp
-  ld a, l
-  cp a, low(1000)
-  jr c, .no_clamp ; $03xx but below 1000, fine
-  .clamp:
-    ld hl, 999
-  .no_clamp:
-
-  ; hl = clamped altitude (from the clamp code above, unchanged)
-  ld c, 100
-  call Div16by8 ; e = how many 100s, hl = what's left (0..99)
-  ld b, e ; stash hundreds in b
-  ld c, 10
-  call Div16by8 ; e = how many 10s, l = what's left (0..9)
-  ld c, e ; c = tens
-  ; b = hundreds, c = tens, l = ones
-
-  ; hundreds cell: blank when the digit is 0
-  ld a, b
-  and a, a
-  jr z, .store_hundreds ; a is already 0 = the blank tile
-  add a, TILE_DIGIT_FIRST
-  .store_hundreds
-  ld [wAltitudeDigits], a
-
-  ; tens cell: blank only when hundreds AND tens are both 0
-  ld a, b
-  or a, c
-  jr z, .store_tens ; both zero -> a = 0 = blank
-  ld a, c
-  add a, TILE_DIGIT_FIRST
-  .store_tens
-  ld [wAltitudeDigits + 1], a
-
-  ; ones cell: always a digit, so "0 M" shows a real zero
-  ld a, l
-  add a, TILE_DIGIT_FIRST
-  ld [wAltitudeDigits + 2], a
-
-  copy [wAltitudeDirty], 1
-  ret
-
-; altitude += de, then republish the display
-; clobbers: a, b, c, d, e, h, l
-Altitude_Add:
-  ld a, [wAltitude]
-  add a, e ; low byte first
-  ld [wAltitude], a
-  ld a, [wAltitude + 1]
-  adc a, d ; carry spills into the high byte
-  ld [wAltitude + 1], a
-  jp UpdateAltitudeDisplay ; tail call, its ret returns to our caller
-
-; altitude -= de, then republish the display
-; clobbers: a, b, c, d, e, h, l
-Altitude_Sub:
-  ld a, [wAltitude]
-  sub a, e ; low byte first
-  ld [wAltitude], a
-  ld a, [wAltitude + 1]
-  sbc a, d ; borrow comes out of the high byte 
-  ld [wAltitude + 1], a
-  jp UpdateAltitudeDisplay ; tail call, its ret returns to our caller
 
 ; judge one A press per sweep against the sweet spot
 ; note: presses during the endpoint pause are ignored
@@ -358,24 +242,7 @@ MoveMarker:
 ; all of play's vblank window work, runs right after OAM DMA
 ; VBLANK ONLY
 Play_Vblank:
-  jp FlushAltitudeDigits ; tail call
-
-; copy the digit cells to the tilemap if they changed since last flush
-; VBLANK ONLY
-; clobbers: a
-FlushAltitudeDigits:
-  ld a, [wAltitudeDirty]
-  and a, a
-  ret z ; nothing changed
-  ld a, [wAltitudeDigits]
-  ld [ALTITUDE_MAP_ADDR], a
-  ld a, [wAltitudeDigits + 1]
-  ld [ALTITUDE_MAP_ADDR + 1], a
-  ld a, [wAltitudeDigits + 2]
-  ld [ALTITUDE_MAP_ADDR + 2], a
-  xor a, a
-  ld [wAltitudeDirty], a
-  ret
+  jp Altitude_Flush ; tail call
 
 ; each entry is "to cross the bar's inner width in CYCLE frames
 ; how much do I add per frame?
@@ -384,4 +251,4 @@ MarkerIncrements:
     dw (BAR_INNER_WIDTH * 256 + CYCLE - 1) / CYCLE
   endr
 
-export Play_Init, FlushAltitudeDigits
+export Play_Init
