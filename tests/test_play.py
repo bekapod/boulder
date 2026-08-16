@@ -50,12 +50,13 @@ def test_perfect_press_rewards_and_forgives(gb, states, tuning):
 
 
 def test_three_misses_end_the_game(gb, states, tuning):
-    """-20% floor-rounded per miss; third strike -> GAMEOVER, 0m."""
+    """altitude/MISS_PENALTY_DIV lost per miss, floor-rounded; third
+    strike -> GAMEOVER, 0m."""
     enter_play(gb, states)
     gb.set16("wAltitude", 47)
 
     miss_once(gb)
-    assert gb.read16("wAltitude") == 38
+    assert gb.read16("wAltitude") == 47 - 47 // tuning["MISS_PENALTY_DIV"]
     assert gb.read("wMissStreak") == 1
 
     for strike in (2, 3):
