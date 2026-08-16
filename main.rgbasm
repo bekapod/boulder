@@ -97,6 +97,8 @@ main:
   ld d, 0
   ld bc, 32 * 32
   call MemSet
+
+  call Sfx_Init
   
   ; init the palette
   ld a, %11100100
@@ -127,6 +129,8 @@ main:
     ; halt wakes on vblank, so this runs at the start of the vblank
     ; window - this is the only safe time to touch OAM
     call hOamDma
+
+    call Sfx_Tick
 
     call FlushAltitudeDigits
     xor a, a

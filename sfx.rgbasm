@@ -1,0 +1,156 @@
+include "hardware.rgbinc"
+
+; script terminator, sits where a row's delay byte would be
+; real delays must stay below $FF
+def SFX_END equ $ff
+def SFX_CHIME equ 0
+def SFX_THUD equ 1
+def SFX_TRIGGER equ %10000000 ; bit 7 of NRx4 - (re)start the channel
+
+export SFX_CHIME, SFX_THUD
+
+section "sfx_ram", wram0
+; per-channel cursor into the running effect script
+; ptr = next unexecuted row, $0000 = channel idle
+wSfxCh2Ptr: ds 2
+wSfxCh2Delay: ds 1 ; frames until that row fires
+wSfxCh4Ptr: ds 2
+WSfxCh4Delay: ds 1
+
+section "sfx", rom0
+
+; one-time APU power-on. must run before any other NR write
+; while NR52's power bit is off, the APU ignores all writes
+Sfx_Init:
+  ld a, AUDENA_ON
+  ldh [rNR52], a
+  ld a, $77 ; left volume 7 (bits 6-4), right volume 7 (bits 2-0)
+  ldh [rNR50], a
+  ld a, AUDTERM_2_LEFT | AUDTERM_2_RIGHT | AUDTERM_4_LEFT | AUDTERM_4_RIGHT
+  ldh [rNR51], a
+
+  ; both channels start idle
+  xor a, a
+  ld [wSfxCh2Ptr], a
+  ld [wSfxCh2Ptr + 1], a
+  ld [wSfxCh4Ptr], a
+  ld [wSfxCh4Ptr + 1], a
+  ret
+
+export Sfx_Init
+
+; advance both channels' running effects by one frame
+; called once per frame from main's loop
+Sfx_Tick:
+  ld hl, wSfxCh2Ptr
+  call Sfx_TickChannel
+  ld hl, wSfxCh4Ptr
+  ; fall through into a tail call
+
+; advance one channel: hl = channel state (ptr lo, ptr hi, delay)
+; the delay counter always means "frames until the row at ptr fires"
+Sfx_TickChannel:
+  ld a, [hl+] ; ptr low, loads and bumps hl
+  ld e, a
+  ld a, [hl+] ; ptr high
+  ld d, a
+  or a, e ; sets zero flag only if both bytes were zero, two-byte idle test
+  ret z ; ptr == $0000 -> channel idle
+
+  ; hl now points at the delay counter
+  ld a, [hl]
+  and a, a ; is a zero?
+  jr z, .execute
+  dec [hl] ; not due yet, burn one frame
+  ret
+
+  .execute: ; loops as long as the next row says delay 0
+    ; the row at de is due. rows are (delay, reg, value)
+    inc de ; skip the delay byte, was consumed when scheduled
+    ld a, [de]
+    ld c, a ; c = register's low byte
+    inc de
+    ld a, [de]
+    ldh [c], a ; the write, value -> $FF00 + reg
+    inc de
+
+    ; de now points at the next row (or terminator)
+    ld a, [de]
+    cp a, SFX_END
+    jr z, .finish
+    ld [hl], a ; schedule it, counter = its delay
+    and a, a
+    jr z, .execute ; delay 0 -> same-frame burst, do it now as well
+
+    ; store the advanced pointer back into the state
+    dec hl ; hl was on delay, go back to ptr high
+    ld a, d
+    ld [hl-], a
+    ld [hl], e
+    ret
+
+    .finish:
+      ; script done, mark idle. we do not silence the channel
+      ; the hardware envelope is already doing the fade-out
+      dec hl
+      xor a, a
+      ld [hl-], a
+      ld [hl], a
+      ret
+
+export Sfx_Tick
+
+; start an effect on its channel, a = effect ID (SFX_*)
+; overwrites the channel's cursor, so re-triggering mid-effect
+; restarts it, safe to call any frame
+Sfx_Play:
+  add a, a
+  add a, a ; id * 4
+  ld c, a
+  ld b, 0
+  ld hl, SfxTable
+  add hl, bc
+  ld a, [hl+] ; script address, low byte then high
+  ld e, a
+  ld a, [hl+]
+  ld d, a
+  ld a, [hl+] ; channel state address
+  ld h, [hl]
+  ld l, a ; hl = that channel's state
+  ld a, e
+  ld [hl+], a ; ptr = script start
+  ld a, d
+  ld [hl+], a
+  ld a, [de] ; schedule the first row, counter = its delay byte
+  ld [hl], a
+  ret
+
+export Sfx_Play
+
+SfxTable:
+  dw ChimeScript, wSfxCh2Ptr ; SFX_CHIME
+  dw ThudScript, wSfxCh4Ptr ; SFX_THUD
+
+; hit chime: stuttered slide up - each step retriggers
+; fast envelope pulses between steps
+ChimeScript:
+  db 0, low(rNR21), %00000000
+  db 0, low(rNR22), $91 ; start volume 9, fast fade
+  db 0, low(rNR23), $ac
+  db 0, low(rNR24), SFX_TRIGGER | $04
+  db 3, low(rNR23), $ec
+  db 0, low(rNR24), SFX_TRIGGER | $04
+  db 3, low(rNR23), $2c
+  db 0, low(rNR24), SFX_TRIGGER | $05
+  db 3, low(rNR23), $6c
+  db 0, low(rNR24), SFX_TRIGGER | $05
+  db 3, low(rNR23), $ac
+  db 0, low(rNR24), SFX_TRIGGER | $05
+  db SFX_END
+
+; miss thud: short low noise burst
+ThudScript:
+  db 0, low(rNR42), $c2 ; start volume 12, fast fade
+  db 0, low(rNR43), $64 ; shift 6, 15-bit, divider 4: low rumble
+  db 0, low(rNR44), SFX_TRIGGER
+  db SFX_END

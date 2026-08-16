@@ -85,7 +85,7 @@ def gb():
         str(ROM),
         window="null",
         symbols=str(SYM),
-        sound_emulated=False,
+        sound_emulated=True,
         no_input=True,
     )
     harness = Harness(pyboy)

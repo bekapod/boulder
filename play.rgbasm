@@ -242,10 +242,14 @@ JudgePress:
     copy [wMissStreak], 0 ; reset the miss streak
     copy [wMarkerPause], HIT_FREEZE_FRAMES ; freeze the marker for a few frames
     copy [wFlashFrames], HIT_FREEZE_FRAMES ; flash the sweet spot for a few frames
+    ld a, SFX_CHIME
+    call Sfx_Play
     ld de, HIT_REWARD
     jp Altitude_Add
 
   .miss:
+  ld a, SFX_THUD
+  call Sfx_Play
     ld c, MISS_PENALTY_DIV
     call DivAltitude ; de = penalty = altitude / 5
     call Altitude_Sub ; charge it and republish
