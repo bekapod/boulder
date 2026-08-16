@@ -1,7 +1,2 @@
-*.o
-*.gb
-*.chr
-*.tlm
-*.map
-*.sym
+build/
 *.aseprite

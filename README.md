@@ -20,7 +20,7 @@ and it has a debugger.
 make
 ```
 
-One of the outputs is `boulder.gb` which can be opened with an emulator.
+One of the outputs is `build/boulder.gb` which can be opened with an emulator.
 
 ```sh
 make clean
@@ -39,6 +39,6 @@ headlessly in [PyBoy](https://github.com/Baekalfen/PyBoy) and asserts against WR
 
 ## Running
 
-Open `boulder.gb` in your emulator. The build also produces `boulder.sym`.
+Open `build/boulder.gb` in your emulator. The build also produces `build/boulder.sym`.
 SameBoy picks it up automatically if it's in the same directory as the ROM,
 and then the debugger shows actual label names instead of bare addresses.

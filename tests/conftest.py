@@ -13,8 +13,8 @@ import pytest
 from pyboy import PyBoy
 
 ROOT = Path(__file__).resolve().parent.parent
-ROM = ROOT / "boulder.gb"
-SYM = ROOT / "boulder.sym"
+ROM = ROOT / "build" / "boulder.gb"
+SYM = ROOT / "build" / "boulder.sym"
 
 # Upper bound on boot ROM (~70 frames) + our init before we call the ROM broken.
 BOOT_CAP_FRAMES = 600
