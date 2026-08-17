@@ -24,9 +24,32 @@ export wMarkerDir, wMarkerPos, wMarkerScreenPos, wCycleFrames, wMissStreak
 
 section "play", rom0
 Play_Init:
+  DisableLCD
+
+  ; draw the scene
+  ld de, SceneMapData
+  ld hl, _SCRN0
+  ld b, 18
+
+  .scene_row:
+    ld c, 20 ; c = cells left in this row
+    
+    .scene_cell:
+      ld a, [de] ; fetch the stamp number rgbfx chose
+      inc de ; move forward one byte
+      add a, TILE_SCENE_FIRST
+      ld [hli], a
+      dec c
+      jr nz, .scene_cell ; more cells in this row?
+    ; row seam: the screen row is 20 wide but tilemap row is 32
+    push de
+    ld de, 32 - 20
+    add hl, de
+    pop de
+    dec b
+    jr nz, .scene_row ; morw rows?
+
   ; draw the bar
-  ; needs to be first b/c VRAM writes only stick while the PPU isn't drawing
-  ; and we're at the top of vblank, biggest safe window
   ld hl, _SCRN0 + BAR_TILE_ROW * 32 + BAR_TILE_COL
   ld a, TILE_BAR_FIRST
 
@@ -37,6 +60,7 @@ Play_Init:
     jr nz, .draw_bar
 
   call Altitude_Init
+  copy [rLCDC], LCDC_FLAGS
 
   call ClearShadowOAM
   copy [wShadowOAM + OAMA_Y], MARKER_OAM_Y

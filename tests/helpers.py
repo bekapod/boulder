@@ -41,7 +41,10 @@ def parse_rgbinc(filename: str) -> dict[str, int]:
         # eval is safe here: input is our own repo's tuning.rgbinc, not
         # external data, and builtins are stripped. ast.literal_eval can't
         # be used because expressions reference earlier constants by name.
-        found[name] = int(eval(expr, {"__builtins__": {}}, found))
+        try:
+            found[name] = int(eval(expr, {"__builtins__": {}}, found))
+        except NameError:
+            continue
     assert found, "no constants found in tuning.rgbinc"
     return found
 

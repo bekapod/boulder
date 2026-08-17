@@ -144,12 +144,14 @@ endm
 ; LCD
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+def LCDC_FLAGS equ LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ8 | LCDCF_OBJON | LCDCF_BGON
+
 macro DisableLCD
   ; wait for the vblank
   .wait_vblank\@:
     ld a, [rLY]
     cp a, SCRN_Y
-    jr nz, .wait_vblank\@
+    jr c, .wait_vblank\@
 
   ; turn the LCD off
   xor a

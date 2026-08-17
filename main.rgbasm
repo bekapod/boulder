@@ -58,6 +58,15 @@ DigitsTileData:
   incbin "digits_bg.chr"
 DigitsTileData_End:
 
+SceneTileData:
+  incbin "tileset.chr"
+SceneTileData_End:
+
+SceneMapData:
+  incbin "scene_map.tlm"
+
+export SceneMapData
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 section "main", rom0
@@ -93,6 +102,11 @@ main:
   ld bc, DigitsTileData_End - DigitsTileData
   call MemCopy
 
+  ld hl, SceneTileData
+  ld de, _VRAM + TILE_SCENE_FIRST * 16
+  ld bc, SceneTileData_End - SceneTileData
+  call MemCopy
+
   ; wipe the boot ROM's leftover Nintendo logo from the tilemap
   ld hl, _SCRN0
   ld d, 0
@@ -109,7 +123,7 @@ main:
   ld [rOBP1], a
 
   ; set the graphics parameters and turn LCD back on
-  ld a, LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ8 | LCDCF_OBJON | LCDCF_BGON
+  ld a, LCDC_FLAGS
   ld [rLCDC], a
 
   ; enable the vblank interrupt
