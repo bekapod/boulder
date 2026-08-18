@@ -58,6 +58,14 @@ DigitsTileData:
   incbin "digits_bg.chr"
 DigitsTileData_End:
 
+BoulderTileData:
+  incbin "boulder_obj.chr"
+BoulderTileData_End:
+
+SisyphusTileData:
+  incbin "sisyphus_obj.chr"
+SisyphusTileData_End:
+
 SceneTileData:
   incbin "tileset.chr"
 SceneTileData_End:
@@ -105,6 +113,16 @@ main:
   ld hl, SceneTileData
   ld de, _VRAM + TILE_SCENE_FIRST * 16
   ld bc, SceneTileData_End - SceneTileData
+  call MemCopy
+
+  ld hl, BoulderTileData
+  ld de, _VRAM + TILE_BOULDER_FIRST * 16
+  ld bc, BoulderTileData_End - BoulderTileData
+  call MemCopy
+
+  ld hl, SisyphusTileData
+  ld de, _VRAM + TILE_SISYPHUS_FIRST * 16
+  ld bc, SisyphusTileData_End - SisyphusTileData
   call MemCopy
 
   ; wipe the boot ROM's leftover Nintendo logo from the tilemap

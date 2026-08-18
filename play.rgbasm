@@ -7,6 +7,10 @@ def MARKER_TIP equ MARKER_WIDTH / 2
 ; bar tile x + border + OAM offset
 def MARKER_OAM_X_BASE equ BAR_TILE_COL * 8 + BAR_BORDER_PX + 8 - MARKER_TIP
 def MARKER_OAM_Y equ BAR_TILE_ROW * 8 + 5 + 16 ; 5 = 8px row minus 3px overlap into the bar
+def BOULDER_OAM_Y equ SCRN_Y - 53
+def BOULDER_OAM_X equ 55 + 8
+def SISYPHUS_OAM_Y equ SCRN_Y - 46
+def SISYPHUS_OAM_X equ 40 + 8
 
 section "play_ram", wram0
 wMarkerDir: ds 1
@@ -78,6 +82,11 @@ Play_Init:
   copy [wSlipCounter], 0
   copy [wFlashFrames], 0
   copy [wFlashPending], 0
+
+  ld hl, ActorOamData
+  ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS
+  ld bc, ActorOamData_End - ActorOamData
+  call MemCopy
 
   SetVblankFn Play_Vblank
 
@@ -282,6 +291,19 @@ FlushFlashTiles:
   xor a, a
   ld [wFlashPending], a
   ret
+
+; shadow-OAM entries 1..8: boulder + sisyphus, 2x2 metasprites.
+; each row: Y, X, tile, flags - the OAM struct, in OAM's own order
+ActorOamData:
+  db BOULDER_OAM_Y,      BOULDER_OAM_X,      TILE_BOULDER_FIRST,      0
+  db BOULDER_OAM_Y,      BOULDER_OAM_X + 8,  TILE_BOULDER_FIRST + 1,  0
+  db BOULDER_OAM_Y + 8,  BOULDER_OAM_X,      TILE_BOULDER_FIRST + 2,  0
+  db BOULDER_OAM_Y + 8,  BOULDER_OAM_X + 8,  TILE_BOULDER_FIRST + 3,  0
+  db SISYPHUS_OAM_Y,     SISYPHUS_OAM_X,     TILE_SISYPHUS_FIRST,     0
+  db SISYPHUS_OAM_Y,     SISYPHUS_OAM_X + 8, TILE_SISYPHUS_FIRST + 1, 0
+  db SISYPHUS_OAM_Y + 8, SISYPHUS_OAM_X,     TILE_SISYPHUS_FIRST + 2, 0
+  db SISYPHUS_OAM_Y + 8, SISYPHUS_OAM_X + 8, TILE_SISYPHUS_FIRST + 3, 0
+ActorOamData_End:
 
 ; each entry is "to cross the bar's inner width in CYCLE frames
 ; how much do I add per frame?
