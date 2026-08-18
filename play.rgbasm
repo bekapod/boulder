@@ -23,6 +23,7 @@ wPressUsed: ds 1 ; has a button been pressed in this sweep? 0 = no, 1 = yes
 wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
 wFlashFrames: ds 1 ; counts frames to flash the sweet spot on a hit, 0 = not flashing
 wFlashPending: ds 1 ; tile id to paint at the spot next vblank, 0 = nothing queued
+wBoulderRoll: ds 1 ; (0 = idle-A, 1 = idle-B)
 
 export wMarkerDir, wMarkerPos, wMarkerScreenPos, wCycleFrames, wMissStreak
 
@@ -82,6 +83,7 @@ Play_Init:
   copy [wSlipCounter], 0
   copy [wFlashFrames], 0
   copy [wFlashPending], 0
+  copy [wBoulderRoll], 0
 
   ld hl, ActorOamData
   ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS
@@ -94,7 +96,7 @@ Play_Init:
   ret
 
 Play_Update:
-  call UpdateFlash
+  call UpdateHitFx
   call UpdateSlip
   call MoveMarker
   call RenderMarker ; publishes wMarkerScreenPos
@@ -103,8 +105,8 @@ Play_Update:
 
 ; count down the sweet-spot flash. the hit queued the dark tiles
 ; when the countdown ends, queue the light ones back
-; clobbers: a
-UpdateFlash:
+; clobbers: a, b, c, d, e, h, l
+UpdateHitFx:
   ld a, [wFlashFrames]
   and a, a
   ret z ; no flash running
@@ -112,6 +114,7 @@ UpdateFlash:
   ld [wFlashFrames], a
   ret nz ; still flashing, dark tiles already on screen
   copy [wFlashPending], TILE_BAR_FIRST + FLASH_TILE_OFFSET ; queue the light set
+  call RestoreActors
   ret
 
 ; lost 1m of altitude every SLIP_FRAMES frames, clamped at 0
@@ -156,6 +159,12 @@ JudgePress:
     copy [wMarkerPause], HIT_FREEZE_FRAMES ; freeze the marker for a few frames
     copy [wFlashFrames], HIT_FREEZE_FRAMES ; flash the sweet spot for a few frames
     copy [wFlashPending], TILE_BAR_DARK_FIRST ; queue the dark set for vblank
+    ld a, ACTOR_FRAME_PUSH
+    call SetActorFrame
+    call NudgeActorsUpSlope
+    ld a, [wBoulderRoll]
+    xor a, 1
+    ld [wBoulderRoll], a
     ld a, SFX_CHIME
     call Sfx_Play
     ld de, HIT_REWARD
@@ -290,6 +299,72 @@ FlushFlashTiles:
   ld [hl], a
   xor a, a
   ld [wFlashPending], a
+  ret
+
+; re-pose both actors: rewrite entries 1..8's tile ids from the
+; ActorOamData table, shifted to frame offset a (0 = idle)
+; clobbers a, b, c, d, e, h, l
+SetActorFrame:
+  ld b, a
+  ld c, 8
+  ld hl, ActorOamData + OAMA_TILEID
+  ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS + OAMA_TILEID
+  .entry:
+    ld a, [hl] ; idle tile from the table
+    add a, b ; shift to the requested frame
+    ld [de], a ; pose the live entry
+    inc hl ; both pointers shift forward by 4 to the next entry's tile byte
+    inc hl ; inc is a 16-bit step so page crossings are safe
+    inc hl
+    inc hl
+    inc de
+    inc de
+    inc de
+    inc de
+    dec c
+    jr nz, .entry
+  ret
+
+; move both actors 2px up-slope for the push; RestoreActors snaps them back
+; clobbers a, c, h, l
+NudgeActorsUpSlope:
+  ld hl, wShadowOAM + 1 * sizeof_OAM_ATTRS ; entry 1's Y byte
+  ld c, 8
+  .entry:
+    dec [hl] ; Y -= 1: up
+    inc hl ; -> X
+    inc [hl] ; X += 2: up-slope is rightward
+    inc [hl]
+    inc hl ; step over tile + flags to the next entry's Y
+    inc hl
+    inc hl
+    dec c
+    jr nz, .entry
+  ret
+
+; snap both actors back: idle pose + home positions from the ROM table,
+; then swap the boulder back to idle-B if wBoulderRoll is set
+; clobbers a, b, c, d, e, h, l
+RestoreActors:
+  ld hl, ActorOamData
+  ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS
+  ld bc, ActorOamData_End - ActorOamData
+  call MemCopy
+  ld a, [wBoulderRoll]
+  and a, a
+  ret z ; the table already is the pose
+  ld hl, wShadowOAM + 1 * sizeof_OAM_ATTRS + OAMA_TILEID
+  ld c, 4
+  .tile:
+    ld a, [hl]
+    add a, BOULDER_FRAME_ROLL
+    ld [hl], a
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    dec c
+    jr nz, .tile
   ret
 
 ; shadow-OAM entries 1..8: boulder + sisyphus, 2x2 metasprites.
