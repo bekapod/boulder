@@ -190,6 +190,8 @@ JudgePress:
     cp a, MISS_LIMIT
     ret c ; survived: display already updated
     copy [wTumbleFrames], TUMBLE_FRAMES
+    ld a, SFX_RUMBLE
+    call Sfx_Play ; replaces thud on ch4 with rumble
     xor a, a
     ld [wTumbleVel], a
     ld [wTumbleVel + 1], a

@@ -5,6 +5,7 @@ include "hardware.rgbinc"
 def SFX_END equ $ff
 def SFX_CHIME equ 0
 def SFX_THUD equ 1
+def SFX_RUMBLE equ 2
 def SFX_TRIGGER equ %10000000 ; bit 7 of NRx4 - (re)start the channel
 ; per-channel effect state
 rsreset
@@ -12,7 +13,7 @@ def SFX_CH_PTR rb 2 ; next unexecuted row, low byte first, $0000 = idle
 def SFX_CH_DELAY rb 1 ; frames until the row at ptr fires
 def sizeof_SFX_CH rb 0
 
-export SFX_CHIME, SFX_THUD
+export SFX_CHIME, SFX_THUD, SFX_RUMBLE
 
 section "sfx_ram", wram0
 ; per-channel cursor into the running effect script
@@ -132,6 +133,7 @@ export Sfx_Play
 SfxTable:
   dw ChimeScript, wSfxCh2 ; SFX_CHIME
   dw ThudScript, wSfxCh4 ; SFX_THUD
+  dw RumbleScript, wSfxCh4 ; SFX_RUMBLE
 
 ; hit chime: stuttered slide up - each step retriggers
 ; fast envelope pulses between steps
@@ -154,5 +156,28 @@ ChimeScript:
 ThudScript:
   db 0, low(rNR42), $c2 ; start volume 12, fast fade
   db 0, low(rNR43), $64 ; shift 6, 15-bit, divider 4: low rumble
+  db 0, low(rNR44), SFX_TRIGGER
+  db SFX_END
+
+; third-miss rumble: impact, then the boulder rumbles away down the hill
+; each burst is quieter and deeper than the one before
+RumbleScript:
+  db 0, low(rNR42), $d3 ; impact: volume 13, slow fade
+  db 0, low(rNR43), $64 ; shift 6, 15-bit, divider 4
+  db 0, low(rNR44), SFX_TRIGGER
+  db 12, low(rNR42), $b3 ; volume 11
+  db 0, low(rNR43), $65 ; a bit deeper, divider 5
+  db 0, low(rNR44), SFX_TRIGGER
+  db 12, low(rNR42), $93 ; volume 9
+  db 0, low(rNR43), $74 ; shift 7, octave down
+  db 0, low(rNR44), SFX_TRIGGER
+  db 12, low(rNR42), $73 ; volume 7
+  db 0, low(rNR43), $75
+  db 0, low(rNR44), SFX_TRIGGER
+  db 12, low(rNR42), $53 ; volume 5
+  db 0, low(rNR43), $84
+  db 0, low (rNR44), SFX_TRIGGER
+  db 12, low(rNR42), $33 ; volume 3
+  db 0, low(rNR43), $85
   db 0, low(rNR44), SFX_TRIGGER
   db SFX_END
