@@ -20,7 +20,7 @@ def SLIP_FRAMES equ 30
 def METRES_PER_SPEEDUP equ 10 ; every Xm climbed trims 1 frame off the cycle
 
 def TUMBLE_FRAMES equ 75 ; the tumble plays this long before GAMEOVER
-def TUMBLE_ACCEL equ 6 ; boulders gravity
+def TUMBLE_ACCEL equ 6 ; the boulder's gravity
 def TUMBLE_FLINCH_FRAMES equ 15 ; flinch holds this long before despair sets in
 
 def SWEET_SPOT_WIDTH equ 12

@@ -37,11 +37,11 @@ Play_Init:
   ; draw the scene
   ld de, SceneMapData
   ld hl, _SCRN0
-  ld b, 18
+  ld b, SCRN_Y_B
 
   .scene_row:
-    ld c, 20 ; c = cells left in this row
-    
+    ld c, SCRN_X_B ; c = cells left in this row
+
     .scene_cell:
       ld a, [de] ; fetch the stamp number rgbfx chose
       inc de ; move forward one byte
@@ -51,11 +51,11 @@ Play_Init:
       jr nz, .scene_cell ; more cells in this row?
     ; row seam: the screen row is 20 wide but tilemap row is 32
     push de
-    ld de, 32 - 20
+    ld de, SCRN_VX_B - SCRN_X_B
     add hl, de
     pop de
     dec b
-    jr nz, .scene_row ; morw rows?
+    jr nz, .scene_row ; more rows?
 
   ; draw the bar
   ld hl, _SCRN0 + BAR_TILE_ROW * 32 + BAR_TILE_COL

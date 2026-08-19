@@ -176,7 +176,7 @@ RumbleScript:
   db 0, low(rNR44), SFX_TRIGGER
   db 12, low(rNR42), $53 ; volume 5
   db 0, low(rNR43), $84
-  db 0, low (rNR44), SFX_TRIGGER
+  db 0, low(rNR44), SFX_TRIGGER
   db 12, low(rNR42), $33 ; volume 3
   db 0, low(rNR43), $85
   db 0, low(rNR44), SFX_TRIGGER
