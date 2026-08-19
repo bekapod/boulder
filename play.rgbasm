@@ -24,6 +24,9 @@ wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
 wFlashFrames: ds 1 ; counts frames to flash the sweet spot on a hit, 0 = not flashing
 wFlashPending: ds 1 ; tile id to paint at the spot next vblank, 0 = nothing queued
 wBoulderRoll: ds 1 ; (0 = idle-A, 1 = idle-B)
+wTumbleFrames: ds 1 ; counts frames of the tumble animation, 0 = not tumbling
+wTumbleVel: ds 2
+wTumbleDist: ds 2
 
 export wMarkerDir, wMarkerPos, wMarkerScreenPos, wCycleFrames, wMissStreak
 
@@ -186,8 +189,101 @@ JudgePress:
     ld [wMissStreak], a
     cp a, MISS_LIMIT
     ret c ; survived: display already updated
-    SwitchState GameOver_Init, STATE_GAMEOVER
+    copy [wTumbleFrames], TUMBLE_FRAMES
+    xor a, a
+    ld [wTumbleVel], a
+    ld [wTumbleVel + 1], a
+    ld [wTumbleDist], a
+    ld [wTumbleDist + 1], a
+    SwitchState Play_TumbleUpdate, STATE_TUMBLE
     ret
+
+; third strike: the boulder escapes. input is dead b/c JudgePress
+; is never called from here. counts down, then GAMEOVER
+Play_TumbleUpdate:
+  ; vel += accel
+  ld a, [wTumbleVel]
+  add a, TUMBLE_ACCEL
+  ld [wTumbleVel], a
+  ld a, [wTumbleVel + 1]
+  adc a, 0
+  ld [wTumbleVel + 1], a
+
+  ; dist += vel
+  ld a, [wTumbleVel]
+  ld e, a
+  ld a, [wTumbleVel + 1]
+  ld d, a
+  ld a, [wTumbleDist]
+  add a, e
+  ld [wTumbleDist], a
+  ld a, [wTumbleDist + 1]
+  adc a, d
+  ld [wTumbleDist + 1], a
+
+  ld a, [wTumbleDist + 1] ; whole pixels rolled
+  ld b, a
+  call MoveTumbleBoulder
+
+  ld a, [wTumbleFrames]
+  cp a, TUMBLE_FRAMES - TUMBLE_FLINCH_FRAMES
+  call z, SetSisyphusDespair
+
+  ; finish the tumble
+  ld a, [wTumbleFrames]
+  dec a
+  ld [wTumbleFrames], a
+  ret nz
+  SwitchState GameOver_Init, STATE_GAMEOVER
+  ret
+
+; put the boulder's 4 entries at home + b pixels down the diagonal
+; (y + b, x - 2b) clamp x to 0 (hidden) once it underflows the edge
+; in: b = whole pixels rolled
+; clobbers: a, c, d, e, h, l
+MoveTumbleBoulder:
+  ld hl, ActorOamData
+  ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS
+  ld c, 4
+  .entry:
+    ld a, [hli] ; home Y
+    add a, b
+    ld [de], a ; Y = home + dist: downhill
+    inc de
+    ld a, [hli]
+    sub a, b
+    jr c, .gone ; already past the edge after one subtract
+    sub a, b ; X = home - 2*dist: leftward, twice as fast
+    jr nc, .store
+    .gone:
+      xor a, a ; X = 0 parks the sprite fully off-screen left
+    .store:
+    ld [de], a
+    inc hl ; skip the table's tile + flags
+    inc hl
+    inc de ; skip the live tile + flags to the next entry's Y
+    inc de
+    inc de
+    dec c
+    jr nz, .entry
+  ret
+
+; slump sisyphus into despair pose
+; clobbers: a, c, h, l
+SetSisyphusDespair:
+  ld hl, wShadowOAM + 5 * sizeof_OAM_ATTRS + OAMA_TILEID
+  ld a, TILE_SISYPHUS_FIRST + SISYPHUS_FRAME_DESPAIR
+  ld c, 4
+  .tile:
+    ld [hl], a
+    inc a
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    dec c
+    jr nz, .tile
+  ret
 
 ; move the marker sprite to match wMarkerPos/wMarkerDir
 ; publishes wMarkerScreenPos

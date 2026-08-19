@@ -121,5 +121,13 @@ def force_game_over(gb, states) -> None:
     for _ in range(3):
         miss_once(gb)
         if gb.state != states["STATE_PLAY"]:
-            return  # the third strike landed; PLAY is over
+            break  # the third strike landed; PLAY is over
         next_sweep(gb)
+
+    tick_until(
+        gb,
+        lambda: gb.state == states["STATE_GAMEOVER"],
+        _T["TUMBLE_FRAMES"] + 8,
+        "tumble to end",
+    )
+    gb.tick(1)

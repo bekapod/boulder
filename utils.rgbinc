@@ -122,6 +122,7 @@ endm
 def STATE_TITLE equ 0
 def STATE_PLAY equ 1
 def STATE_GAMEOVER equ 2
+def STATE_TUMBLE equ 3
 
 ; point the state machine at init routine \1 with state id \2
 ; expected to be the last instruction in an update loop
