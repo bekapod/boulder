@@ -14,6 +14,7 @@ def HIT_FREEZE_FRAMES equ 12 ; marker freeze on a hit - the spot flashes this lo
 def MISS_LIMIT equ 3
 def MISS_PENALTY_DIV equ 10 ; a miss costs altitude / 10 (-10%, floor-rounded)
 def MISS_FREEZE_FRAMES equ 4 ; a short stutter so a miss still reads as "registered"
+def MISS_POSE_FRAMES equ 24 ; the stagger holds this long
 
 def SLIP_FRAMES equ 30
 def METRES_PER_SPEEDUP equ 10 ; every Xm climbed trims 1 frame off the cycle

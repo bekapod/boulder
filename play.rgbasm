@@ -171,6 +171,10 @@ JudgePress:
     jp Altitude_Add
 
   .miss:
+    copy [wFlashFrames], MISS_POSE_FRAMES
+    ld a, ACTOR_FRAME_MISS
+    call SetActorFrame
+    call NudgeActorsDownSlope
     ld a, SFX_THUD
     call Sfx_Play
     ld c, MISS_PENALTY_DIV
@@ -336,6 +340,23 @@ NudgeActorsUpSlope:
     inc [hl] ; X += 2: up-slope is rightward
     inc [hl]
     inc hl ; step over tile + flags to the next entry's Y
+    inc hl
+    inc hl
+    dec c
+    jr nz, .entry
+  ret
+
+; move both actors 2px down-slope for the stagger. RestoreActors snaps them back
+; clobbers: a, c, h, l
+NudgeActorsDownSlope:
+  ld hl, wShadowOAM + 1 * sizeof_OAM_ATTRS
+  ld c, 8
+  .entry:
+    inc [hl] ; y += 1: down
+    inc hl
+    dec [hl] ; x -= 2: down-slope is left
+    dec [hl]
+    inc hl
     inc hl
     inc hl
     dec c
