@@ -11,6 +11,9 @@ def BOULDER_OAM_Y equ SCRN_Y - 53
 def BOULDER_OAM_X equ 55 + 8
 def SISYPHUS_OAM_Y equ SCRN_Y - 46
 def SISYPHUS_OAM_X equ 40 + 8
+def OAM_IDX_MARKER equ 0
+def OAM_IDX_BOULDER equ 1
+def OAM_IDX_SISYPHUS equ 5
 
 section "play_ram", wram0
 wMarkerDir: ds 1
@@ -89,7 +92,7 @@ Play_Init:
   copy [wBoulderRoll], 0
 
   ld hl, ActorOamData
-  ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS
+  ld de, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS
   ld bc, ActorOamData_End - ActorOamData
   call MemCopy
 
@@ -245,7 +248,7 @@ Play_TumbleUpdate:
 ; clobbers: a, c, d, e, h, l
 MoveTumbleBoulder:
   ld hl, ActorOamData
-  ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS
+  ld de, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS
   ld c, 4
   .entry:
     ld a, [hli] ; home Y
@@ -273,7 +276,7 @@ MoveTumbleBoulder:
 ; slump sisyphus into despair pose
 ; clobbers: a, c, h, l
 SetSisyphusDespair:
-  ld hl, wShadowOAM + 5 * sizeof_OAM_ATTRS + OAMA_TILEID
+  ld hl, wShadowOAM + OAM_IDX_SISYPHUS * sizeof_OAM_ATTRS + OAMA_TILEID
   ld a, TILE_SISYPHUS_FIRST + SISYPHUS_FRAME_DESPAIR
   ld c, 4
   .tile:
@@ -410,7 +413,7 @@ SetActorFrame:
   ld b, a
   ld c, 8
   ld hl, ActorOamData + OAMA_TILEID
-  ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS + OAMA_TILEID
+  ld de, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS + OAMA_TILEID
   .entry:
     ld a, [hl] ; idle tile from the table
     add a, b ; shift to the requested frame
@@ -430,7 +433,7 @@ SetActorFrame:
 ; move both actors 2px up-slope for the push; RestoreActors snaps them back
 ; clobbers a, c, h, l
 NudgeActorsUpSlope:
-  ld hl, wShadowOAM + 1 * sizeof_OAM_ATTRS ; entry 1's Y byte
+  ld hl, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS ; entry 1's Y byte
   ld c, 8
   .entry:
     dec [hl] ; Y -= 1: up
@@ -447,7 +450,7 @@ NudgeActorsUpSlope:
 ; move both actors 2px down-slope for the stagger. RestoreActors snaps them back
 ; clobbers: a, c, h, l
 NudgeActorsDownSlope:
-  ld hl, wShadowOAM + 1 * sizeof_OAM_ATTRS
+  ld hl, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS
   ld c, 8
   .entry:
     inc [hl] ; y += 1: down
@@ -466,13 +469,13 @@ NudgeActorsDownSlope:
 ; clobbers a, b, c, d, e, h, l
 RestoreActors:
   ld hl, ActorOamData
-  ld de, wShadowOAM + 1 * sizeof_OAM_ATTRS
+  ld de, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS
   ld bc, ActorOamData_End - ActorOamData
   call MemCopy
   ld a, [wBoulderRoll]
   and a, a
   ret z ; the table already is the pose
-  ld hl, wShadowOAM + 1 * sizeof_OAM_ATTRS + OAMA_TILEID
+  ld hl, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS + OAMA_TILEID
   ld c, 4
   .tile:
     ld a, [hl]
