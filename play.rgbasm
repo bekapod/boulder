@@ -26,6 +26,7 @@ wPressUsed: ds 1 ; has a button been pressed in this sweep? 0 = no, 1 = yes
 wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
 wFlashFrames: ds 1 ; counts frames to flash the sweet spot on a hit, 0 = not flashing
 wFlashPending: ds 1 ; tile id to paint at the spot next vblank, 0 = nothing queued
+wPoseFrames: ds 1 ; counts frames until the actors snap back to idle, 0 = idle
 wBoulderRoll: ds 1 ; (0 = idle-A, 1 = idle-B)
 wTumbleFrames: ds 1 ; counts frames of the tumble animation, 0 = not tumbling
 wTumbleVel: ds 2
@@ -88,6 +89,7 @@ Play_Init:
   copy [wPressUsed], 0
   copy [wSlipCounter], 0
   copy [wFlashFrames], 0
+  copy [wPoseFrames], 0
   copy [wFlashPending], 0
   copy [wBoulderRoll], 0
 
@@ -102,17 +104,18 @@ Play_Init:
   ret
 
 Play_Update:
-  call UpdateHitFx
+  call UpdateFlash
+  call UpdatePose
   call UpdateSlip
   call MoveMarker
   call RenderMarker ; publishes wMarkerScreenPos
   call JudgePress
   ret
 
-; count down the sweet-spot flash. the hit queued the dark tiles
+; count down the sweet-spot flash. the hit qeued the dark tiles
 ; when the countdown ends, queue the light ones back
-; clobbers: a, b, c, d, e, h, l
-UpdateHitFx:
+; clobbers: a
+UpdateFlash:
   ld a, [wFlashFrames]
   and a, a
   ret z ; no flash running
@@ -120,8 +123,18 @@ UpdateHitFx:
   ld [wFlashFrames], a
   ret nz ; still flashing, dark tiles already on screen
   copy [wFlashPending], TILE_BAR_FIRST + FLASH_TILE_OFFSET ; queue the light set
-  call RestoreActors
   ret
+
+; count down the actor pose hold, at zero snap both actors to idle
+; clobbers: a, b, c, d, e, h, l
+UpdatePose:
+  ld a, [wPoseFrames]
+  and a, a
+  ret z ; already idle
+  dec a
+  ld [wPoseFrames], a
+  ret nz ; pose still held
+  jp RestoreActors ; tail call
 
 ; lost 1m of altitude every SLIP_FRAMES frames, clamped at 0
 ; clobbers: a, b, c, d, e, h, l
@@ -164,6 +177,7 @@ JudgePress:
     copy [wMissStreak], 0 ; reset the miss streak
     copy [wMarkerPause], HIT_FREEZE_FRAMES ; freeze the marker for a few frames
     copy [wFlashFrames], HIT_FREEZE_FRAMES ; flash the sweet spot for a few frames
+    copy [wPoseFrames], HIT_FREEZE_FRAMES ; hold the actors in their push pose
     copy [wFlashPending], TILE_BAR_DARK_FIRST ; queue the dark set for vblank
     ld a, ACTOR_FRAME_PUSH
     call SetActorFrame
@@ -177,7 +191,7 @@ JudgePress:
     jp Altitude_Add
 
   .miss:
-    copy [wFlashFrames], MISS_POSE_FRAMES
+    copy [wPoseFrames], MISS_POSE_FRAMES
     ld a, ACTOR_FRAME_MISS
     call SetActorFrame
     call NudgeActorsDownSlope
