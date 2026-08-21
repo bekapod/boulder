@@ -17,6 +17,7 @@ def OAM_IDX_SISYPHUS equ 5
 def POSE_IDLE equ 0
 def POSE_PUSH equ 1
 def POSE_MISS equ 2
+def POSE_DESPAIR equ 3
 
 section "play_ram", wram0
 wMarkerDir: ds 1
@@ -246,9 +247,17 @@ Play_TumbleUpdate:
   ld b, a
   call MoveTumbleBoulder
 
+  ; flinch
   ld a, [wTumbleFrames]
   cp a, TUMBLE_FRAMES - TUMBLE_FLINCH_FRAMES
-  call z, SetSisyphusDespair
+  jr nz, .pose_kept
+  copy [wActorPose], POSE_DESPAIR
+  .pose_kept:
+
+  call RenderActors
+  ld a, [wTumbleDist + 1]
+  ld b, a
+  call MoveTumbleBoulder
 
   ; finish the tumble
   ld a, [wTumbleFrames]
@@ -287,23 +296,6 @@ MoveTumbleBoulder:
     inc de
     dec c
     jr nz, .entry
-  ret
-
-; slump sisyphus into despair pose
-; clobbers: a, c, h, l
-SetSisyphusDespair:
-  ld hl, wShadowOAM + OAM_IDX_SISYPHUS * sizeof_OAM_ATTRS + OAMA_TILEID
-  ld a, TILE_SISYPHUS_FIRST + SISYPHUS_FRAME_DESPAIR
-  ld c, 4
-  .tile:
-    ld [hl], a
-    inc a
-    inc hl
-    inc hl
-    inc hl
-    inc hl
-    dec c
-    jr nz, .tile
   ret
 
 ; move the marker sprite to match wMarkerPos/wMarkerDir
@@ -496,6 +488,7 @@ PoseTable:
   db 0, 0, 0 ; POSE_IDLE at home
   db ACTOR_FRAME_PUSH, -1, 2 ; POSE_PUSH: boulder up 1, right 2
   db ACTOR_FRAME_MISS, 1, -2 ; POSE_MISS: boulder down 1, left 2
+  db SISYPHUS_FRAME_DESPAIR, 1, -2 ; POSE_DESPAIR, down slope
 
 ; shadow-OAM entries 1..8: boulder + sisyphus, 2x2 metasprites.
 ; each row: Y, X, tile, flags - the OAM struct, in OAM's own order
