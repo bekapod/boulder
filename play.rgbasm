@@ -14,6 +14,9 @@ def SISYPHUS_OAM_X equ 40 + 8
 def OAM_IDX_MARKER equ 0
 def OAM_IDX_BOULDER equ 1
 def OAM_IDX_SISYPHUS equ 5
+def POSE_IDLE equ 0
+def POSE_PUSH equ 1
+def POSE_MISS equ 2
 
 section "play_ram", wram0
 wMarkerDir: ds 1
@@ -27,6 +30,9 @@ wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
 wFlashFrames: ds 1 ; counts frames to flash the sweet spot on a hit, 0 = not flashing
 wFlashPending: ds 1 ; tile id to paint at the spot next vblank, 0 = nothing queued
 wPoseFrames: ds 1 ; counts frames until the actors snap back to idle, 0 = idle
+wActorPose: ds 1 ; POSE_IDLE, POSE_PUSH, or POSE_MISS, what RenderActors draws
+wRenderDy: ds 1
+wRenderDx: ds 1
 wBoulderRoll: ds 1 ; (0 = idle-A, 1 = idle-B)
 wTumbleFrames: ds 1 ; counts frames of the tumble animation, 0 = not tumbling
 wTumbleVel: ds 2
@@ -93,10 +99,8 @@ Play_Init:
   copy [wFlashPending], 0
   copy [wBoulderRoll], 0
 
-  ld hl, ActorOamData
-  ld de, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS
-  ld bc, ActorOamData_End - ActorOamData
-  call MemCopy
+  copy [wActorPose], POSE_IDLE
+  call RenderActors
 
   SetVblankFn Play_Vblank
 
@@ -110,6 +114,7 @@ Play_Update:
   call MoveMarker
   call RenderMarker ; publishes wMarkerScreenPos
   call JudgePress
+  call RenderActors ; derives actor OAM from the pose, after JudgePress, so the frame a press lands already shows its pose
   ret
 
 ; count down the sweet-spot flash. the hit qeued the dark tiles
@@ -134,7 +139,8 @@ UpdatePose:
   dec a
   ld [wPoseFrames], a
   ret nz ; pose still held
-  jp RestoreActors ; tail call
+  copy [wActorPose], POSE_IDLE
+  ret
 
 ; lost 1m of altitude every SLIP_FRAMES frames, clamped at 0
 ; clobbers: a, b, c, d, e, h, l
@@ -179,9 +185,7 @@ JudgePress:
     copy [wFlashFrames], HIT_FREEZE_FRAMES ; flash the sweet spot for a few frames
     copy [wPoseFrames], HIT_FREEZE_FRAMES ; hold the actors in their push pose
     copy [wFlashPending], TILE_BAR_DARK_FIRST ; queue the dark set for vblank
-    ld a, ACTOR_FRAME_PUSH
-    call SetActorFrame
-    call NudgeActorsUpSlope
+    copy [wActorPose], POSE_PUSH
     ld a, [wBoulderRoll]
     xor a, 1
     ld [wBoulderRoll], a
@@ -192,9 +196,7 @@ JudgePress:
 
   .miss:
     copy [wPoseFrames], MISS_POSE_FRAMES
-    ld a, ACTOR_FRAME_MISS
-    call SetActorFrame
-    call NudgeActorsDownSlope
+    copy [wActorPose], POSE_MISS
     ld a, SFX_THUD
     call Sfx_Play
     ld c, MISS_PENALTY_DIV
@@ -420,88 +422,80 @@ FlushFlashTiles:
   ld [wFlashPending], a
   ret
 
-; re-pose both actors: rewrite entries 1..8's tile ids from the
-; ActorOamData table, shifted to frame offset a (0 = idle)
-; clobbers a, b, c, d, e, h, l
-SetActorFrame:
+; derive all 8 actor entries from ActorOamData + the active pose
+; Y = home + dy, X = home + dx, tile = base + frame
+; an idle boulder shows the roll frame when wBoulderRoll is set
+; clobbers: a, b, c, d, e, h, l
+RenderActors:
+  ; point hl at the active pose's row: PoseTable + pose * 3
+  ld a, [wActorPose]
+  ld c, a
+  add a, a ; a = pose * 2
+  add a, c ; a = pose * 3
+  ld c, a
+  ld b, 0
+  ld hl, PoseTable
+  add hl, bc
+  ; unpack the row: frame offset to b, deltas to scratch
+  ld a, [hli]
   ld b, a
-  ld c, 8
-  ld hl, ActorOamData + OAMA_TILEID
-  ld de, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS + OAMA_TILEID
-  .entry:
-    ld a, [hl] ; idle tile from the table
-    add a, b ; shift to the requested frame
-    ld [de], a ; pose the live entry
-    inc hl ; both pointers shift forward by 4 to the next entry's tile byte
-    inc hl ; inc is a 16-bit step so page crossings are safe
-    inc hl
-    inc hl
-    inc de
-    inc de
-    inc de
-    inc de
-    dec c
-    jr nz, .entry
-  ret
+  ld a, [hli]
+  ld [wRenderDy], a
+  ld a, [hl]
+  ld [wRenderDx], a
 
-; move both actors 2px up-slope for the push; RestoreActors snaps them back
-; clobbers a, c, h, l
-NudgeActorsUpSlope:
-  ld hl, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS ; entry 1's Y byte
-  ld c, 8
-  .entry:
-    dec [hl] ; Y -= 1: up
-    inc hl ; -> X
-    inc [hl] ; X += 2: up-slope is rightward
-    inc [hl]
-    inc hl ; step over tile + flags to the next entry's Y
-    inc hl
-    inc hl
-    dec c
-    jr nz, .entry
-  ret
+  ; sisyphus, table's second half
+  ld hl, ActorOamData + 4 * sizeof_OAM_ATTRS
+  ld de, wShadowOAM + OAM_IDX_SISYPHUS * sizeof_OAM_ATTRS
+  call RenderMetasprite
 
-; move both actors 2px down-slope for the stagger. RestoreActors snaps them back
-; clobbers: a, c, h, l
-NudgeActorsDownSlope:
-  ld hl, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS
-  ld c, 8
-  .entry:
-    inc [hl] ; y += 1: down
-    inc hl
-    dec [hl] ; x -= 2: down-slope is left
-    dec [hl]
-    inc hl
-    inc hl
-    inc hl
-    dec c
-    jr nz, .entry
-  ret
-
-; snap both actors back: idle pose + home positions from the ROM table,
-; then swap the boulder back to idle-B if wBoulderRoll is set
-; clobbers a, b, c, d, e, h, l
-RestoreActors:
-  ld hl, ActorOamData
-  ld de, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS
-  ld bc, ActorOamData_End - ActorOamData
-  call MemCopy
+  ; boulder
+  ld a, [wActorPose]
+  and a, a ; POSE_IDLE? push/miss frames override the roll
+  jr nz, .frame_set
   ld a, [wBoulderRoll]
   and a, a
-  ret z ; the table already is the pose
-  ld hl, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS + OAMA_TILEID
+  jr z, .frame_set
+  ld b, BOULDER_FRAME_ROLL
+  .frame_set:
+  ld hl, ActorOamData
+  ld de, wShadowOAM + OAM_IDX_BOULDER * sizeof_OAM_ATTRS
+  jp RenderMetasprite ; tail call
+
+; write one 2x2 metasprite: 4 entries from table rows at hl to shadow
+; OAM at de, positions offset by the scratch deltas, tiles shifted by b
+; in: hl = ActorOamData rows, de = dest, b = frame offset
+; clobbers: a, c, d, e, h, l
+RenderMetasprite:
   ld c, 4
-  .tile:
-    ld a, [hl]
-    add a, BOULDER_FRAME_ROLL
-    ld [hl], a
+  .entry:
+    ld a, [wRenderDy]
+    add a, [hl] ; a = dy + home Y
     inc hl
+    ld [de], a
+    inc de
+    ld a, [wRenderDx]
+    add a, [hl] ; a = dx + home X
     inc hl
-    inc hl
-    inc hl
+    ld [de], a
+    inc de
+    ld a, [hli] ; base tile
+    add a, b
+    ld [de], a
+    inc de
+    ld a, [hli] ; flags, straight through
+    ld [de], a
+    inc de
     dec c
-    jr nz, .tile
+    jr nz, .entry
   ret
+
+; one row per pose: tile-frame offset, then the position delta from
+; the actors table homes. rows are 3 bytes, indexed by wActorPose
+PoseTable:
+  db 0, 0, 0 ; POSE_IDLE at home
+  db ACTOR_FRAME_PUSH, -1, 2 ; POSE_PUSH: boulder up 1, right 2
+  db ACTOR_FRAME_MISS, 1, -2 ; POSE_MISS: boulder down 1, left 2
 
 ; shadow-OAM entries 1..8: boulder + sisyphus, 2x2 metasprites.
 ; each row: Y, X, tile, flags - the OAM struct, in OAM's own order
