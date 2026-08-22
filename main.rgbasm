@@ -163,6 +163,10 @@ main:
   ld a, IEF_VBLANK
   ld [rIE], a
 
+  xor a
+  ld [wBest], a
+  ld [wBest + 1], a
+
   SetVblankFn VblankNop
   SwitchState Title_Init, STATE_TITLE
 

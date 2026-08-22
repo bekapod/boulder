@@ -64,6 +64,8 @@ Div16by8:
 ; clobbers: a, b, c, h, l
 UpdateAltitudeDisplay:
   call LoadAltitude
+
+BuildDigits:
   ld a, h
   cp a, high(1000)
   jr c, .no_clamp ; high byte below $03 -> at most 767, fine
@@ -148,4 +150,4 @@ Altitude_Flush:
   ld [wAltitudeDirty], a
   ret
 
-export Altitude_Init, Altitude_Add, Altitude_Sub, DivAltitude, Altitude_Flush
+export Altitude_Init, Altitude_Add, Altitude_Sub, DivAltitude, Altitude_Flush, BuildDigits

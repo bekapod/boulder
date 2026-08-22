@@ -1,0 +1,15 @@
+include "tiles.rgbinc"
+include "utils.rgbinc"
+
+section "font", rom0
+
+DrawText:
+  .char:
+    ld a, [de]
+    cp a, TEXT_END
+    ret z
+    ld [hli], a
+    inc de
+    jr .char
+
+export DrawText

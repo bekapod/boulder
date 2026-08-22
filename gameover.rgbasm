@@ -1,18 +1,148 @@
+include "tiles.rgbinc"
 include "utils.rgbinc"
 
+def GAMEOVER_ROW equ 5
+def GAMEOVER_COL equ 5
+def RUN_ROW equ 9
+def BEST_ROW equ 11
+def LABEL_COL equ 4
+def VALUE_COL equ 12
+def NEWBEST_ROW equ 14
+def NEWBEST_COL equ 5
+def BLINK_FRAMES equ 30
+
 section "game_over_ram", wram0
+wBest: ds 2 ; best peak this session
+wNewBest: ds 1 ; 0 = no new best, 1 = new best
+wBlinkFrames: ds 1
+wBlinkVisible: ds 1 ; 0 or 1, whether the "new best" is showing
+wBlinkDirty: ds 1
+
+export wBest
 
 section "game_over", rom0
 GameOver_Init:
+  DisableLCD
+
+  ; blank the whole tilemap
+  ld hl, _SCRN0
+  ld d, 0
+  ld bc, SCRN_VX_B * SCRN_VY_B
+  call MemSet
+
+  ld de, GameOverText
+  ld hl, _SCRN0 + GAMEOVER_ROW * SCRN_VX_B + GAMEOVER_COL
+  call DrawText
+
+  ld de, RunText
+  ld hl, _SCRN0 + RUN_ROW * SCRN_VX_B + LABEL_COL
+  call DrawText
+
+  ld de, BestText
+  ld hl, _SCRN0 + BEST_ROW * SCRN_VX_B + LABEL_COL
+  call DrawText
+
+  ; record check
+  ld a, [wBest]
+  ld hl, wAltitude
+  sub a, [hl]
+  ld a, [wBest + 1]
+  inc hl
+  sbc a, [hl]
+  jr c, .record
+    xor a, a
+    ld [wNewBest], a
+    jr .compared
+  .record:
+    copy [wNewBest], 1
+    ld a, [wAltitude]
+    ld [wBest], a
+    ld a, [wAltitude + 1]
+    ld [wBest + 1], a
+  .compared:
+
+  ld a, [wAltitude]
+  ld l, a
+  ld a, [wAltitude + 1]
+  ld h, a
+  call BuildDigits
+  ld a, [wAltitudeDigits]
+  ld [_SCRN0 + RUN_ROW * SCRN_VX_B + VALUE_COL], a
+  ld a, [wAltitudeDigits + 1]
+  ld [_SCRN0 + RUN_ROW * SCRN_VX_B + VALUE_COL + 1], a
+  ld a, [wAltitudeDigits + 2]
+  ld [_SCRN0 + RUN_ROW * SCRN_VX_B + VALUE_COL + 2], a
+
+  ld a, [wBest]
+  ld l, a
+  ld a, [wBest + 1]
+  ld h, a
+  call BuildDigits
+  ld a, [wAltitudeDigits]
+  ld [_SCRN0 + BEST_ROW * SCRN_VX_B + VALUE_COL], a
+  ld a, [wAltitudeDigits + 1]
+  ld [_SCRN0 + BEST_ROW * SCRN_VX_B + VALUE_COL + 1], a
+  ld a, [wAltitudeDigits + 2]
+  ld [_SCRN0 + BEST_ROW * SCRN_VX_B + VALUE_COL + 2], a
+
+  ld a, [wNewBest]
+  and a, a
+  jr z, .no_record
+  ld de, NewBestText
+  ld hl, _SCRN0 + NEWBEST_ROW * SCRN_VX_B + NEWBEST_COL
+  call DrawText
+  .no_record:
+
+  copy [wBlinkFrames], BLINK_FRAMES
+  copy [wBlinkVisible], 1
+  copy [wBlinkDirty], 0
+
+  copy [rLCDC], LCDC_FLAGS
   call ClearShadowOAM
-  SetVblankFn VblankNop
+  SetVblankFn GameOver_Vblank
   SwitchState GameOver_Update, STATE_GAMEOVER
   ret
 
 GameOver_Update:
+  ld a, [wNewBest]
+  and a, a
+  jr z, .no_blink
+  ld a, [wBlinkFrames]
+  dec a
+  ld [wBlinkFrames], a
+  jr nz, .no_blink
+  copy [wBlinkFrames], BLINK_FRAMES
+  ld a, [wBlinkVisible]
+  xor a, 1
+  ld [wBlinkVisible], a
+  copy [wBlinkDirty], 1
+  .no_blink:
+
   TestPadInput_Pressed wPadInput, PADF_START
   ret nz
   SwitchState Play_Init, STATE_PLAY
   ret
+
+GameOver_Vblank:
+  ld a, [wBlinkDirty]
+  and a, a
+  ret z
+  xor a
+  ld [wBlinkDirty], a
+
+  ld de, BlanksText
+  ld a, [wBlinkVisible]
+  and a, a
+  jr z, .draw
+  ld de, NewBestText
+  .draw:
+  ld hl, _SCRN0 + NEWBEST_ROW * SCRN_VX_B + NEWBEST_COL
+  jp DrawText ; tail call
+
+GameOverText: db "GAME OVER", TEXT_END
+RunText: db "RUN", TEXT_END
+BestText: db "BEST", TEXT_END
+NewBestText: db "NEW BEST!", TEXT_END
+BlanksText: db "         ", TEXT_END ; 9 spaces, erases NEW BEST!
 
 export GameOver_Init

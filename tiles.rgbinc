@@ -20,8 +20,22 @@ def TILE_BAR_FIRST equ 2
 def TILE_BAR_DARK_FIRST equ TILE_BAR_FIRST + 9 ; dark variants of bar tiles 3..5
 
 def TILE_DIGIT_FIRST equ TILE_BAR_DARK_FIRST + 3
-def TILE_LETTER_M equ TILE_DIGIT_FIRST + 10
-def TILE_BOULDER_FIRST equ TILE_LETTER_M + 1
+def TILE_FONT_FIRST equ TILE_DIGIT_FIRST + 10 ; 'A'
+def TILE_LETTER_M equ TILE_FONT_FIRST + 12
+def TILE_EXCLAIM equ TILE_FONT_FIRST + 26
+
+charmap " ", 0
+charmap "!", TILE_EXCLAIM
+for I, 26
+  charmap strslice("ABCDEFGHIJKLMNOPQRSTUVWXYZ", I, I + 1), TILE_FONT_FIRST + I
+endr
+for I, 10
+  charmap strslice("0123456789", I, I + 1), TILE_DIGIT_FIRST + I
+endr
+
+def TEXT_END equ $FF ; string terminator, outside any font tile range
+
+def TILE_BOULDER_FIRST equ TILE_EXCLAIM + 1
 def BOULDER_FRAME_ROLL equ 12 ; idle-B
 def SISYPHUS_FRAME_DESPAIR equ 12
 def TILE_SISYPHUS_FIRST equ TILE_BOULDER_FIRST + 16
