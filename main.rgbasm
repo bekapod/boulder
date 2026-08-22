@@ -73,7 +73,17 @@ SceneTileData_End:
 SceneMapData:
   incbin "scene_map.tlm"
 
-export SceneMapData
+TitleTileData:
+  incbin "title.chr"
+TitleTileData_End:
+
+TitleMapData:
+  incbin "title.tlm"
+
+assert TILE_TITLE_FIRST + (TitleTileData_End - TitleTileData) / 16 <= 256, \
+  "title tiles overflow the 256-tile table"
+
+export SceneMapData, TitleMapData
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -123,6 +133,11 @@ main:
   ld hl, SisyphusTileData
   ld de, _VRAM + TILE_SISYPHUS_FIRST * 16
   ld bc, SisyphusTileData_End - SisyphusTileData
+  call MemCopy
+
+  ld hl, TitleTileData
+  ld de, _VRAM + TILE_TITLE_FIRST * 16
+  ld bc, TitleTileData_End - TitleTileData
   call MemCopy
 
   ; wipe the boot ROM's leftover Nintendo logo from the tilemap

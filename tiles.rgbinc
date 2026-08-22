@@ -26,6 +26,7 @@ def BOULDER_FRAME_ROLL equ 12 ; idle-B
 def SISYPHUS_FRAME_DESPAIR equ 12
 def TILE_SISYPHUS_FIRST equ TILE_BOULDER_FIRST + 16
 def TILE_SCENE_FIRST equ TILE_SISYPHUS_FIRST + 16
+def TILE_TITLE_FIRST equ TILE_SCENE_FIRST + 34
 
 def ACTOR_FRAME_PUSH equ 4 ; the offset from an actor's idle to its push frame
 def ACTOR_FRAME_MISS equ 8

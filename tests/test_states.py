@@ -3,9 +3,7 @@
 START advances TITLE and retries from GAMEOVER, and does nothing during PLAY
 """
 
-from helpers import (
-    force_game_over,
-)
+from helpers import force_game_over, ROOT
 
 
 def test_rom_boots_without_crashing(gb):
@@ -36,3 +34,13 @@ def test_full_loop_play_gameover_retry(gb, states):
 
     gb.press("start")
     assert gb.state == states["STATE_PLAY"]
+
+
+def test_title_screen_shows_the_title_map(gb):
+    """Boot draws title.tlm into the BG map at one uniform tile offset."""
+    tlm = (ROOT / "build" / "title.tlm").read_bytes()
+    vram = gb.pyboy.memory[0x9800 : 0x9800 + 18 * 32]
+    cells = [vram[row * 32 + col] for row in range(18) for col in range(20)]
+    offset = cells[0] - tlm[0]
+    assert offset > 0, "title tiles should sit above the shared low slots"
+    assert all(c - t == offset for c, t in zip(cells, tlm))

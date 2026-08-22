@@ -1,15 +1,89 @@
+include "tiles.rgbinc"
 include "utils.rgbinc"
 
+def BLINK_FRAMES equ 30
+def BLINK_ROW equ 16
+def BLINK_COL equ 6
+def BLINK_WIDTH equ 8
+
 section "title_ram", wram0
+wBlinkFrames: ds 1
+wBlinkVisible: ds 1 ; 0 or 1, whether the "press start" text is visible
+wBlinkDirty: ds 1
 
 section "title", rom0
 Title_Init:
+  DisableLCD
+  
+  ; draw the title
+  ld de, TitleMapData
+  ld hl, _SCRN0
+  ld b, SCRN_Y_B
+
+  .title_row:
+    ld c, SCRN_X_B ; c = cells left in this row
+
+    .title_cell:
+      ld a, [de] ; fetch the stamp number rgbfx chose
+      inc de ; move forward one byte
+      add a, TILE_TITLE_FIRST
+      ld [hli], a
+      dec c
+      jr nz, .title_cell ; more cells in this row?
+    ; row seam: the screen row is 20 wide but tilemap row is 32
+    push de
+    ld de, SCRN_VX_B - SCRN_X_B
+    add hl, de
+    pop de
+    dec b
+    jr nz, .title_row ; more rows?
+
+  copy [rLCDC], LCDC_FLAGS
   call ClearShadowOAM
-  SetVblankFn VblankNop
+  copy [wBlinkFrames], BLINK_FRAMES
+  copy [wBlinkVisible], 1
+  copy [wBlinkDirty], 0
+  SetVblankFn Title_Vblank
   SwitchState Title_Update, STATE_TITLE
   ret
 
+Title_Vblank:
+  ld a, [wBlinkDirty]
+  and a, a
+  ret z
+  xor a
+  ld [wBlinkDirty], a
+
+  ld de, TitleMapData + (BLINK_ROW + 1) * SCRN_X_B + BLINK_COL
+  ld a, [wBlinkVisible]
+  and a, a
+  jr z, .copy
+  ld de, TitleMapData + BLINK_ROW * SCRN_X_B + BLINK_COL
+
+  .copy:
+  ld hl, _SCRN0 + BLINK_ROW * SCRN_VX_B + BLINK_COL
+  ld b, BLINK_WIDTH
+  .cell:
+    ld a, [de]
+    inc de
+    add a, TILE_TITLE_FIRST
+    ld [hli], a
+    dec b
+    jr nz, .cell
+  ret
+
 Title_Update:
+  ld a, [wBlinkFrames]
+  dec a
+  ld [wBlinkFrames], a
+  jr nz, .no_toggle
+  copy [wBlinkFrames], BLINK_FRAMES
+  ld a, [wBlinkVisible]
+  xor a, 1
+  ld [wBlinkVisible], a
+  copy [wBlinkDirty], 1
+  .no_toggle:
+
   TestPadInput_Pressed wPadInput, PADF_START
   ret nz
   SwitchState Play_Init, STATE_PLAY
