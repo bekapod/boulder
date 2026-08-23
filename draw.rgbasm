@@ -16,6 +16,29 @@ DrawText:
     inc de
     jr .char
 
+; stamp a TEXT_END-terminated string as sprites, one per character
+; in: b = OAM y, c = OAM x, de = string, hl = shadow OAM dest
+; out: hl = just past the last entry, so calls chain
+; clobbers: a, c, d, e, h, l
+DrawTextSprites:
+  .char:
+    ld a, [de]
+    cp a, TEXT_END
+    ret z
+    ld a, b
+    ld [hli], a ; byte 0: y
+    ld a, c
+    ld [hli], a ; byte 1: x
+    ld a, [de]
+    ld [hli], a ; byte 2: tile id
+    xor a, a
+    ld [hli], a ; byte 3: attrs (palette OBP0, no flips)
+    inc de
+    ld a, c
+    add a, SPRITE_PITCH
+    ld c, a
+    jr .char
+
 ; stamp c map cells: read a stamp number from de, add the tile
 ; base in b, write to the tilemap at hl
 ; in: de = map data, hl = tilemap dest, b = tile base, c = cell count
@@ -50,4 +73,4 @@ DrawMap:
     jr nz, .row
   ret
 
-export DrawText, DrawMapCells, DrawMap
+export DrawText, DrawMapCells, DrawMap, DrawTextSprites

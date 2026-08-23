@@ -8,9 +8,10 @@ SCRN0 = 0x9800
 BLINK_PERIOD = 2 * BLINK["BLINK_FRAMES"] + 10
 
 
-def cell(gb, row, col):
-    """One BG tilemap cell."""
-    return gb.pyboy.memory[SCRN0 + row * 32 + col]
+def sprite(gb, slot):
+    """One shadow-OAM entry as [y, x, tile, attrs]."""
+    a = gb.pyboy.symbol_lookup("wShadowOAM")[1] + slot * 4
+    return list(gb.pyboy.memory[a : a + 4])
 
 
 def expected_digits(value):
@@ -21,19 +22,21 @@ def expected_digits(value):
     return [base + h if h else 0, base + t if h or t else 0, base + o]
 
 
-def value_digits(gb, row):
-    return [cell(gb, row, GO["VALUE_COL"] + i) for i in range(3)]
+def value_digits(gb, first_slot):
+    return [sprite(gb, first_slot + i)[2] for i in range(3)]
 
 
 def newbest_visible(gb):
-    return cell(gb, GO["NEWBEST_ROW"], GO["NEWBEST_COL"]) != 0
+    return sprite(gb, GO["SPR_NEWBEST_FIRST"])[0] != 0
 
 
 def test_run_shows_death_altitude(gb, states):
     enter_play(gb, states)
     gb.set16("wAltitude", 500)
     force_game_over(gb, states)
-    assert value_digits(gb, GO["RUN_ROW"]) == expected_digits(gb.read16("wAltitude"))
+    assert value_digits(gb, GO["SPR_RUN_VALUE"]) == expected_digits(
+        gb.read16("wAltitude")
+    )
 
 
 def test_record_updates_best_and_blinks(gb, states):
@@ -44,7 +47,7 @@ def test_record_updates_best_and_blinks(gb, states):
     final = gb.read16("wAltitude")
     assert final > 0, "death spiral drained the altitude to zero"
     assert gb.read16("wBest") == final
-    assert value_digits(gb, GO["BEST_ROW"]) == expected_digits(final)
+    assert value_digits(gb, GO["SPR_BEST_VALUE"]) == expected_digits(final)
 
     seen = set()
     for _ in range(BLINK_PERIOD):
@@ -60,7 +63,7 @@ def test_no_record_leaves_best_alone(gb, states):
     force_game_over(gb, states)
 
     assert gb.read16("wBest") == 900
-    assert value_digits(gb, GO["BEST_ROW"]) == expected_digits(900)
+    assert value_digits(gb, GO["SPR_BEST_VALUE"]) == expected_digits(900)
     for _ in range(BLINK_PERIOD):
         assert not newbest_visible(gb)
         gb.tick(1)

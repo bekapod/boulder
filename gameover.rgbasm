@@ -1,14 +1,18 @@
 include "tiles.rgbinc"
 include "utils.rgbinc"
 
-def GAMEOVER_ROW equ 5
-def GAMEOVER_COL equ 5
-def RUN_ROW equ 9
-def BEST_ROW equ 11
-def LABEL_COL equ 4
-def VALUE_COL equ 12
-def NEWBEST_ROW equ 14
-def NEWBEST_COL equ 5
+def GAMEOVER_Y equ 62
+def GAMEOVER_X equ 60
+def RUN_Y equ 79
+def BEST_Y equ 89
+def LABEL_X equ 49
+def VALUE_X equ 99
+def NEWBEST_Y equ 106
+def NEWBEST_X equ 60
+def SPR_RUN_VALUE equ 12 ; slots 12-14: run digits, 15: M
+def SPR_BEST_VALUE equ 20 ; slots 20-22: best digits, 23: M
+def SPR_NEWBEST_FIRST equ 24 ; slots 24-32: NEW BEST!
+def SPR_NEWBEST_COUNT equ 9
 
 section "game_over_ram", wram0
 wBest: ds 2 ; best peak this session
@@ -20,23 +24,14 @@ section "game_over", rom0
 GameOver_Init:
   DisableLCD
 
-  ; blank the whole tilemap
-  ld hl, _SCRN0
-  ld d, 0
-  ld bc, SCRN_VX_B * SCRN_VY_B
-  call MemSet
+  ld hl, GameOverTileData
+  ld de, _VRAM + TILE_FULLSCREEN_FIRST * 16
+  ld bc, GameOverTileData_End - GameOverTileData
+  call MemCopy
 
-  ld de, GameOverText
-  ld hl, _SCRN0 + GAMEOVER_ROW * SCRN_VX_B + GAMEOVER_COL
-  call DrawText
-
-  ld de, RunText
-  ld hl, _SCRN0 + RUN_ROW * SCRN_VX_B + LABEL_COL
-  call DrawText
-
-  ld de, BestText
-  ld hl, _SCRN0 + BEST_ROW * SCRN_VX_B + LABEL_COL
-  call DrawText
+  ld de, GameOverMapData
+  ld b, TILE_FULLSCREEN_FIRST
+  call DrawMap
 
   ; record check
   ld a, [wBest]
@@ -57,33 +52,65 @@ GameOver_Init:
     ld [wBest + 1], a
   .compared:
 
+  call Blink_Init
+
+  copy [rLCDC], LCDC_FLAGS
+  call ClearShadowOAM
+
+  ld hl, wShadowOAM
+
+  ld b, GAMEOVER_Y
+  ld c, GAMEOVER_X
+  ld de, GameOverText
+  call DrawTextSprites
+
+  ld b, RUN_Y
+  ld c, LABEL_X
+  ld de, RunText
+  call DrawTextSprites
+
+  ld b, RUN_Y
+  ld c, VALUE_X
+  ld de, ValueText
+  call DrawTextSprites
+
+  ld b, BEST_Y
+  ld c, LABEL_X
+  ld de, BestText
+  call DrawTextSprites
+
+  ld b, BEST_Y
+  ld c, VALUE_X
+  ld de, ValueText
+  call DrawTextSprites
+
+  ld b, NEWBEST_Y
+  ld c, NEWBEST_X
+  ld de, NewBestText
+  call DrawTextSprites
+
   ld a, [wAltitude]
   ld l, a
   ld a, [wAltitude + 1]
   ld h, a
-  ld de, _SCRN0 + RUN_ROW * SCRN_VX_B + VALUE_COL
-  call DrawDigits
+  ld de, wShadowOAM + SPR_RUN_VALUE * 4 + OAMA_TILEID
+  call DrawDigitSprites
 
   ld a, [wBest]
   ld l, a
   ld a, [wBest + 1]
   ld h, a
-  ld de, _SCRN0 + BEST_ROW * SCRN_VX_B + VALUE_COL
-  call DrawDigits
+  ld de, wShadowOAM + SPR_BEST_VALUE * 4 + OAMA_TILEID
+  call DrawDigitSprites
 
   ld a, [wNewBest]
   and a, a
-  jr z, .no_record
-  ld de, NewBestText
-  ld hl, _SCRN0 + NEWBEST_ROW * SCRN_VX_B + NEWBEST_COL
-  call DrawText
-  .no_record:
+  jr nz, .newbest_shown
+  ld b, 0
+  call SetNewBestSpritesY
+  .newbest_shown:
 
-  call Blink_Init
-
-  copy [rLCDC], LCDC_FLAGS
-  call ClearShadowOAM
-  SetVblankFn GameOver_Vblank
+  SetVblankFn VblankNop
   SwitchState GameOver_Update, STATE_GAMEOVER
   ret
 
@@ -92,6 +119,19 @@ GameOver_Update:
   and a, a
   jr z, .no_blink
   call Blink_Tick
+  ld a, [wBlinkDirty]
+  and a, a
+  jr z, .no_blink
+  xor a, a
+  ld [wBlinkDirty], a
+
+  ld b, 0
+  ld a, [wBlinkVisible]
+  and a, a
+  jr z, .apply
+  ld b, NEWBEST_Y
+  .apply:
+  call SetNewBestSpritesY
   .no_blink:
 
   TestPadInput_Pressed wPadInput, PADF_START
@@ -99,26 +139,25 @@ GameOver_Update:
   SetStateFn Play_Init
   ret
 
-GameOver_Vblank:
-  ld a, [wBlinkDirty]
-  and a, a
-  ret z
-  xor a
-  ld [wBlinkDirty], a
-
-  ld de, BlanksText
-  ld a, [wBlinkVisible]
-  and a, a
-  jr z, .draw
-  ld de, NewBestText
-  .draw:
-  ld hl, _SCRN0 + NEWBEST_ROW * SCRN_VX_B + NEWBEST_COL
-  jp DrawText ; tail call
+; set the y of all NEW BEST! sprites (0 = hidden offscreen)
+; in: b = OAM y
+; clobbers: a, c, h, l
+SetNewBestSpritesY:
+  ld hl, wShadowOAM + SPR_NEWBEST_FIRST * 4 + OAMA_Y
+  ld c, SPR_NEWBEST_COUNT
+  .spr:
+    ld [hl], b
+    ld a, l
+    add a, sizeof_OAM_ATTRS
+    ld l, a
+    dec c
+    jr nz, .spr
+  ret
 
 GameOverText: db "GAME OVER", TEXT_END
 RunText: db "RUN", TEXT_END
 BestText: db "BEST", TEXT_END
 NewBestText: db "NEW BEST!", TEXT_END
-BlanksText: db "         ", TEXT_END ; 9 spaces, erases NEW BEST!
+ValueText: db "000M", TEXT_END
 
 export GameOver_Init

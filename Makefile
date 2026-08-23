@@ -1,13 +1,14 @@
 ROM_NAME := $(notdir $(CURDIR))
 BUILD := build
 MAP_PNGS := $(wildcard art/*_map.png)
-SHEET_PNGS := $(filter-out $(MAP_PNGS) art/title.png,$(wildcard art/*.png))
+FULLSCREEN_PNGS := art/title.png art/gameover.png
+SHEET_PNGS := $(filter-out $(MAP_PNGS) $(FULLSCREEN_PNGS),$(wildcard art/*.png))
 OBJS := $(patsubst %.rgbasm,$(BUILD)/%.o,$(wildcard *.rgbasm))
 CHRS := $(patsubst art/%.png,$(BUILD)/%.chr,$(SHEET_PNGS))
 TLMS := $(patsubst art/%_map.png,$(BUILD)/%_map.tlm,$(MAP_PNGS))
 
-CHRS += $(BUILD)/title.chr
-TLMS += $(BUILD)/title.tlm
+CHRS += $(patsubst art/%.png,$(BUILD)/%.chr,$(FULLSCREEN_PNGS))
+TLMS += $(patsubst art/%.png,$(BUILD)/%.tlm,$(FULLSCREEN_PNGS))
 
 $(BUILD)/$(ROM_NAME).gb: $(OBJS)
 	rgblink --dmg --tiny --map $(BUILD)/$(ROM_NAME).map --sym $(BUILD)/$(ROM_NAME).sym -o $@ $^
@@ -25,10 +26,10 @@ $(BUILD)/%_map.tlm: art/%_map.png $(BUILD)/tileset.chr | $(BUILD)
 $(BUILD)/%.chr: art/%.png | $(BUILD)
 	rgbgfx --colors '#9bbc0f,#8bac0f,#306230,#0f380f' --output $@ $<
 
-$(BUILD)/title.tlm: art/title.png | $(BUILD)
-	rgbgfx --colors '#9bbc0f,#8bac0f,#306230,#0f380f' --unique-tiles --tilemap $@ --output $(BUILD)/title.chr $<
+$(patsubst art/%.png,$(BUILD)/%.tlm,$(FULLSCREEN_PNGS)): $(BUILD)/%.tlm: art/%.png | $(BUILD)
+	rgbgfx --colors '#9bbc0f,#8bac0f,#306230,#0f380f' --unique-tiles --tilemap $@ --output $(BUILD)/$*.chr $<
 
-$(BUILD)/title.chr: $(BUILD)/title.tlm ;
+$(patsubst art/%.png,$(BUILD)/%.chr,$(FULLSCREEN_PNGS)): $(BUILD)/%.chr: $(BUILD)/%.tlm ;
 
 $(BUILD):
 	mkdir -p $(BUILD)

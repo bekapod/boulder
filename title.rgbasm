@@ -8,10 +8,15 @@ def BLINK_WIDTH equ 8
 section "title", rom0
 Title_Init:
   DisableLCD
+
+  ld hl, TitleTileData
+  ld de, _VRAM + TILE_FULLSCREEN_FIRST * 16
+  ld bc, TitleTileData_End - TitleTileData
+  call MemCopy
   
   ; draw the title
   ld de, TitleMapData
-  ld b, TILE_TITLE_FIRST
+  ld b, TILE_FULLSCREEN_FIRST
   call DrawMap
 
   copy [rLCDC], LCDC_FLAGS
@@ -36,7 +41,7 @@ Title_Vblank:
 
   .copy:
   ld hl, _SCRN0 + BLINK_ROW * SCRN_VX_B + BLINK_COL
-  ld b, TILE_TITLE_FIRST
+  ld b, TILE_FULLSCREEN_FIRST
   ld c, BLINK_WIDTH
   jp DrawMapCells ; tail call
 

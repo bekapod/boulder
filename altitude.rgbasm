@@ -135,6 +135,29 @@ DrawDigits:
   ld [de], a
   ret
 
+; patch 3 digit-sprite tile ids in shadow OAM for a value
+; safe anytime: writes shadow OAM not VRAM
+; in: hl = value, de = tile-id byte of the first digit's OAM entry
+; clobbers: a, b, c, d, e, h, l
+DrawDigitSprites:
+  push de ; BuildDigits clobbers de
+  call BuildDigits
+  pop de
+  ld hl, wAltitudeDigits
+  ld a, [hli]
+  ld [de], a ; hundreds - first digit sprite's tile id
+  ld a, e
+  add a, sizeof_OAM_ATTRS ; go to next entry's tile id
+  ld e, a
+  ld a, [hli]
+  ld [de], a ; tens - second digit sprite's tile id
+  ld a, e
+  add a, sizeof_OAM_ATTRS ; go to next entry's tile id
+  ld e, a
+  ld a, [hl]
+  ld [de], a ; ones
+  ret
+
 ; altitude += de, then republish the display
 ; clobbers: a, b, c, d, e, h, l
 Altitude_Add:
@@ -174,4 +197,4 @@ Altitude_Flush:
   ld [wAltitudeDirty], a
   ret
 
-export Altitude_Init, Altitude_Add, Altitude_Sub, DivAltitude, Altitude_Flush, BuildDigits, DrawDigits
+export Altitude_Init, Altitude_Add, Altitude_Sub, DivAltitude, Altitude_Flush, BuildDigits, DrawDigits, DrawDigitSprites

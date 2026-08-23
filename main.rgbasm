@@ -80,10 +80,19 @@ TitleTileData_End:
 TitleMapData:
   incbin "title.tlm"
 
-assert TILE_TITLE_FIRST + (TitleTileData_End - TitleTileData) / 16 <= 256, \
-  "title tiles overflow the 256-tile table"
+GameOverTileData:
+  incbin "gameover.chr"
+GameOverTileData_End:
 
-export SceneMapData, TitleMapData
+GameOverMapData:
+  incbin "gameover.tlm"
+
+assert TILE_FULLSCREEN_FIRST + (TitleTileData_End - TitleTileData) / 16 <= 256, \
+  "title tiles overflow the 256-tile table"
+assert TILE_FULLSCREEN_FIRST + (GameOverTileData_End - GameOverTileData) / 16 <= 256, \
+  "gameover tiles overflow the 256-tile table"
+
+export SceneMapData, TitleMapData, TitleTileData, TitleTileData_End, GameOverMapData, GameOverTileData, GameOverTileData_End
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -133,11 +142,6 @@ main:
   ld hl, SisyphusTileData
   ld de, _VRAM + TILE_SISYPHUS_FIRST * 16
   ld bc, SisyphusTileData_End - SisyphusTileData
-  call MemCopy
-
-  ld hl, TitleTileData
-  ld de, _VRAM + TILE_TITLE_FIRST * 16
-  ld bc, TitleTileData_End - TitleTileData
   call MemCopy
 
   ; wipe the boot ROM's leftover Nintendo logo from the tilemap
