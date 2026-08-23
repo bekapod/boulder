@@ -2,9 +2,10 @@ from helpers import enter_play, force_game_over, parse_rgbinc
 
 TILES = parse_rgbinc("tiles.rgbinc")
 GO = parse_rgbinc("gameover.rgbasm")
+BLINK = parse_rgbinc("blink.rgbasm")
 
 SCRN0 = 0x9800
-BLINK_PERIOD = 2 * GO["BLINK_FRAMES"] + 10
+BLINK_PERIOD = 2 * BLINK["BLINK_FRAMES"] + 10
 
 
 def cell(gb, row, col):

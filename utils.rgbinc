@@ -133,6 +133,14 @@ macro SwitchState
   copy [wStateId], \2
 endm
 
+; point the state machine at init routine \1 without touching the
+; state id: the init publishes the id itself (via SwitchState) once
+; the state is live
+macro SetStateFn
+  copy [wStateFn], low(\1)
+  copy [wStateFn + 1], high(\1)
+endm
+
 ; point the per-state vblank hook at routine \1
 ; the hook runs at the top of every vblank, right after OAM DMA
 ; expected to be called from a state's Init

@@ -72,7 +72,10 @@ def test_three_misses_end_the_game(gb, states, tuning):
     tap_a(gb)
     tap_a(gb)
     tap_a(gb)
+
     assert final == gb.read16("wAltitude")
+    assert 0 < final < 47  # penalties + slip bled it, but it wasn't zeroed
+    assert digit_cells(gb) == expected_cells(final)
 
     tick_until(
         gb,
@@ -80,8 +83,6 @@ def test_three_misses_end_the_game(gb, states, tuning):
         tuning["TUMBLE_FRAMES"] + 8,
         "game over",
     )
-    assert 0 < final < 47  # penalties + slip bled it, but it wasn't zeroed
-    assert digit_cells(gb) == expected_cells(final)
 
     # replaying resets it
     gb.tick(1)

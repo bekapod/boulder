@@ -31,9 +31,9 @@ wSlipCounter: ds 1 ; counts frames 0..29, resets at SLIP_FRAMES
 wFlashFrames: ds 1 ; counts frames to flash the sweet spot on a hit, 0 = not flashing
 wFlashPending: ds 1 ; tile id to paint at the spot next vblank, 0 = nothing queued
 wPoseFrames: ds 1 ; counts frames until the actors snap back to idle, 0 = idle
-wActorPose: ds 1 ; POSE_IDLE, POSE_PUSH, or POSE_MISS, what RenderActors draws
-wRenderDy: ds 1
-wRenderDx: ds 1
+wActorPose: ds 1 ; POSE_IDLE, POSE_PUSH, POSE_DESPAIR, or POSE_MISS, what RenderActors draws
+wRenderDy: ds 1 ; scratch: the active pose's deltas, unpacked by
+wRenderDx: ds 1 ; RenderActors, read per-entry by RenderMetasprite
 wBoulderRoll: ds 1 ; (0 = idle-A, 1 = idle-B)
 wTumbleFrames: ds 1 ; counts frames of the tumble animation, 0 = not tumbling
 wTumbleVel: ds 2
@@ -47,26 +47,8 @@ Play_Init:
 
   ; draw the scene
   ld de, SceneMapData
-  ld hl, _SCRN0
-  ld b, SCRN_Y_B
-
-  .scene_row:
-    ld c, SCRN_X_B ; c = cells left in this row
-
-    .scene_cell:
-      ld a, [de] ; fetch the stamp number rgbfx chose
-      inc de ; move forward one byte
-      add a, TILE_SCENE_FIRST
-      ld [hli], a
-      dec c
-      jr nz, .scene_cell ; more cells in this row?
-    ; row seam: the screen row is 20 wide but tilemap row is 32
-    push de
-    ld de, SCRN_VX_B - SCRN_X_B
-    add hl, de
-    pop de
-    dec b
-    jr nz, .scene_row ; more rows?
+  ld b, TILE_SCENE_FIRST
+  call DrawMap
 
   ; draw the bar
   ld hl, _SCRN0 + BAR_TILE_ROW * 32 + BAR_TILE_COL
@@ -82,10 +64,10 @@ Play_Init:
   copy [rLCDC], LCDC_FLAGS
 
   call ClearShadowOAM
-  copy [wShadowOAM + OAMA_Y], MARKER_OAM_Y
-  copy [wShadowOAM + OAMA_X], MARKER_OAM_X_BASE
-  copy [wShadowOAM + OAMA_TILEID], TILE_MARKER
-  copy [wShadowOAM + OAMA_FLAGS], 0 ; attrs 0 = no flips, in front of BG, OBP0 (object palette 0)
+  copy [wShadowOAM + OAM_IDX_MARKER * sizeof_OAM_ATTRS + OAMA_Y], MARKER_OAM_Y
+  copy [wShadowOAM + OAM_IDX_MARKER * sizeof_OAM_ATTRS + OAMA_X], MARKER_OAM_X_BASE
+  copy [wShadowOAM + OAM_IDX_MARKER * sizeof_OAM_ATTRS + OAMA_TILEID], TILE_MARKER
+  copy [wShadowOAM + OAM_IDX_MARKER * sizeof_OAM_ATTRS + OAMA_FLAGS], 0 ; attrs 0 = no flips, in front of BG, OBP0 (object palette 0)
   copy [wMarkerDir], 0 ; 0 = moving right, 1 = moving left
   copy [wMarkerPos], 0
   copy [wMarkerPos + 1], 0
@@ -118,7 +100,7 @@ Play_Update:
   call RenderActors ; derives actor OAM from the pose, after JudgePress, so the frame a press lands already shows its pose
   ret
 
-; count down the sweet-spot flash. the hit qeued the dark tiles
+; count down the sweet-spot flash. the hit queued the dark tiles
 ; when the countdown ends, queue the light ones back
 ; clobbers: a
 UpdateFlash:
@@ -243,10 +225,6 @@ Play_TumbleUpdate:
   adc a, d
   ld [wTumbleDist + 1], a
 
-  ld a, [wTumbleDist + 1] ; whole pixels rolled
-  ld b, a
-  call MoveTumbleBoulder
-
   ; flinch
   ld a, [wTumbleFrames]
   cp a, TUMBLE_FRAMES - TUMBLE_FLINCH_FRAMES
@@ -255,7 +233,7 @@ Play_TumbleUpdate:
   .pose_kept:
 
   call RenderActors
-  ld a, [wTumbleDist + 1]
+  ld a, [wTumbleDist + 1] ; whole pixels rolled
   ld b, a
   call MoveTumbleBoulder
 
@@ -264,7 +242,7 @@ Play_TumbleUpdate:
   dec a
   ld [wTumbleFrames], a
   ret nz
-  SwitchState GameOver_Init, STATE_GAMEOVER
+  SetStateFn GameOver_Init
   ret
 
 ; put the boulder's 4 entries at home + b pixels down the diagonal
@@ -318,7 +296,7 @@ RenderMarker:
   ld a, b
   ld [wMarkerScreenPos], a ; publish before converting to an OAM coordinate
   add a, MARKER_OAM_X_BASE
-  ld [wShadowOAM + OAMA_X], a
+  ld [wShadowOAM + OAM_IDX_MARKER * sizeof_OAM_ATTRS + OAMA_X], a
   ret
 
 ; wCycleFrames = CYCLE_FRAMES - altitude / METRES_PER_SPEEDUP,
@@ -419,31 +397,34 @@ FlushFlashTiles:
 ; an idle boulder shows the roll frame when wBoulderRoll is set
 ; clobbers: a, b, c, d, e, h, l
 RenderActors:
-  ; point hl at the active pose's row: PoseTable + pose * 3
+  ; point hl at the active pose's row: PoseTable + pose * 4
   ld a, [wActorPose]
-  ld c, a
   add a, a ; a = pose * 2
-  add a, c ; a = pose * 3
+  add a, a ; a = pose * 4
   ld c, a
   ld b, 0
   ld hl, PoseTable
   add hl, bc
-  ; unpack the row: frame offset to b, deltas to scratch
-  ld a, [hli]
-  ld b, a
+  ; unpack the deltas to scratch
   ld a, [hli]
   ld [wRenderDy], a
-  ld a, [hl]
+  ld a, [hli]
   ld [wRenderDx], a
 
   ; sisyphus, table's second half
+  ld a, [hli] ; sisyphus frame
+  ld b, a
+  push hl ; RenderMetasprite clobbers hl, save table pointer
   ld hl, ActorOamData + 4 * sizeof_OAM_ATTRS
   ld de, wShadowOAM + OAM_IDX_SISYPHUS * sizeof_OAM_ATTRS
   call RenderMetasprite
+  pop hl ; back to the boulder-frame byte
 
   ; boulder
+  ld a, [hl] ; boulder frame
+  ld b, a
   ld a, [wActorPose]
-  and a, a ; POSE_IDLE? push/miss frames override the roll
+  and a, a ; POSE_IDLE? pose frames override the roll
   jr nz, .frame_set
   ld a, [wBoulderRoll]
   and a, a
@@ -482,13 +463,14 @@ RenderMetasprite:
     jr nz, .entry
   ret
 
-; one row per pose: tile-frame offset, then the position delta from
-; the actors table homes. rows are 3 bytes, indexed by wActorPose
+; one row per pose: position delta from the actors' table homes,
+; then each actor's tile-frame offset. rows are 4 bytes, indexed
+; by wActorPose
 PoseTable:
-  db 0, 0, 0 ; POSE_IDLE at home
-  db ACTOR_FRAME_PUSH, -1, 2 ; POSE_PUSH: boulder up 1, right 2
-  db ACTOR_FRAME_MISS, 1, -2 ; POSE_MISS: boulder down 1, left 2
-  db SISYPHUS_FRAME_DESPAIR, 1, -2 ; POSE_DESPAIR, down slope
+  db 0, 0, 0, 0 ; POSE_IDLE at home
+  db -1, 2, ACTOR_FRAME_PUSH, ACTOR_FRAME_PUSH ; up 1, right 2
+  db 1, -2, ACTOR_FRAME_MISS, ACTOR_FRAME_MISS ; down 1, left 2
+  db 1, -2, SISYPHUS_FRAME_DESPAIR, BOULDER_FRAME_ROLL
 
 ; shadow-OAM entries 1..8: boulder + sisyphus, 2x2 metasprites.
 ; each row: Y, X, tile, flags - the OAM struct, in OAM's own order

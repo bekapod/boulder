@@ -1,0 +1,53 @@
+include "tiles.rgbinc"
+include "utils.rgbinc"
+
+section "draw", rom0
+
+; copy a TEXT_END-terminated string to the tilemap
+; LCD-OFF or VBLANK ONLY
+; in: de = string, hl = tilemap dest
+; clobbers: a, d, e, h, l
+DrawText:
+  .char:
+    ld a, [de]
+    cp a, TEXT_END
+    ret z
+    ld [hli], a
+    inc de
+    jr .char
+
+; stamp c map cells: read a stamp number from de, add the tile
+; base in b, write to the tilemap at hl
+; in: de = map data, hl = tilemap dest, b = tile base, c = cell count
+; clobbers: a, c, d, e, h, l
+DrawMapCells:
+  .cell:
+    ld a, [de] ; fetch the stamp number rgbfx chose
+    inc de
+    add a, b
+    ld [hli], a
+    dec c
+    jr nz, .cell
+  ret
+
+; stamp a full 20x18 map onto the visible screen
+; in: de = map data, b = tile base
+; clobbers: a, c, d, e, h, l
+DrawMap:
+  ld hl, _SCRN0
+  ld a, SCRN_Y_B ; rows left
+  .row:
+    push af ; no register is free for the row counter, so it waits on the stack
+    ld c, SCRN_X_B
+    call DrawMapCells
+    ; row seam: the screen row is 20 wide but the tilemap row is 32
+    push de
+    ld de, SCRN_VX_B - SCRN_X_B
+    add hl, de
+    pop de
+    pop af
+    dec a
+    jr nz, .row
+  ret
+
+export DrawText, DrawMapCells, DrawMap

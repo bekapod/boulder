@@ -9,14 +9,10 @@ def LABEL_COL equ 4
 def VALUE_COL equ 12
 def NEWBEST_ROW equ 14
 def NEWBEST_COL equ 5
-def BLINK_FRAMES equ 30
 
 section "game_over_ram", wram0
 wBest: ds 2 ; best peak this session
 wNewBest: ds 1 ; 0 = no new best, 1 = new best
-wBlinkFrames: ds 1
-wBlinkVisible: ds 1 ; 0 or 1, whether the "new best" is showing
-wBlinkDirty: ds 1
 
 export wBest
 
@@ -65,25 +61,15 @@ GameOver_Init:
   ld l, a
   ld a, [wAltitude + 1]
   ld h, a
-  call BuildDigits
-  ld a, [wAltitudeDigits]
-  ld [_SCRN0 + RUN_ROW * SCRN_VX_B + VALUE_COL], a
-  ld a, [wAltitudeDigits + 1]
-  ld [_SCRN0 + RUN_ROW * SCRN_VX_B + VALUE_COL + 1], a
-  ld a, [wAltitudeDigits + 2]
-  ld [_SCRN0 + RUN_ROW * SCRN_VX_B + VALUE_COL + 2], a
+  ld de, _SCRN0 + RUN_ROW * SCRN_VX_B + VALUE_COL
+  call DrawDigits
 
   ld a, [wBest]
   ld l, a
   ld a, [wBest + 1]
   ld h, a
-  call BuildDigits
-  ld a, [wAltitudeDigits]
-  ld [_SCRN0 + BEST_ROW * SCRN_VX_B + VALUE_COL], a
-  ld a, [wAltitudeDigits + 1]
-  ld [_SCRN0 + BEST_ROW * SCRN_VX_B + VALUE_COL + 1], a
-  ld a, [wAltitudeDigits + 2]
-  ld [_SCRN0 + BEST_ROW * SCRN_VX_B + VALUE_COL + 2], a
+  ld de, _SCRN0 + BEST_ROW * SCRN_VX_B + VALUE_COL
+  call DrawDigits
 
   ld a, [wNewBest]
   and a, a
@@ -93,9 +79,7 @@ GameOver_Init:
   call DrawText
   .no_record:
 
-  copy [wBlinkFrames], BLINK_FRAMES
-  copy [wBlinkVisible], 1
-  copy [wBlinkDirty], 0
+  call Blink_Init
 
   copy [rLCDC], LCDC_FLAGS
   call ClearShadowOAM
@@ -107,20 +91,12 @@ GameOver_Update:
   ld a, [wNewBest]
   and a, a
   jr z, .no_blink
-  ld a, [wBlinkFrames]
-  dec a
-  ld [wBlinkFrames], a
-  jr nz, .no_blink
-  copy [wBlinkFrames], BLINK_FRAMES
-  ld a, [wBlinkVisible]
-  xor a, 1
-  ld [wBlinkVisible], a
-  copy [wBlinkDirty], 1
+  call Blink_Tick
   .no_blink:
 
   TestPadInput_Pressed wPadInput, PADF_START
   ret nz
-  SwitchState Play_Init, STATE_PLAY
+  SetStateFn Play_Init
   ret
 
 GameOver_Vblank:

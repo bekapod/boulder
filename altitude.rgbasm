@@ -65,6 +65,11 @@ Div16by8:
 UpdateAltitudeDisplay:
   call LoadAltitude
 
+; build wAltitudeDigits (3 tiles, left-blank-padded, clamped at 999)
+; for an arbitrary value. UpdateAltitudeDisplay falls through into
+; here after loading the live altitude
+; in: hl = value
+; clobbers: a, b, c, d, e, h, l
 BuildDigits:
   ld a, h
   cp a, high(1000)
@@ -111,6 +116,25 @@ BuildDigits:
   copy [wAltitudeDirty], 1
   ret
 
+; build the 3 digit tiles for a value and write them to the tilemap
+; LCD-OFF ONLY: writes VRAM without waiting for a safe window
+; in: hl = value, de = tilemap dest
+; clobbers: a, b, c, d, e, h, l
+DrawDigits:
+  push de ; BuildDigits clobbers de
+  call BuildDigits
+  pop de
+  ld hl, wAltitudeDigits
+  ld a, [hli]
+  ld [de], a
+  inc de
+  ld a, [hli]
+  ld [de], a
+  inc de
+  ld a, [hl]
+  ld [de], a
+  ret
+
 ; altitude += de, then republish the display
 ; clobbers: a, b, c, d, e, h, l
 Altitude_Add:
@@ -150,4 +174,4 @@ Altitude_Flush:
   ld [wAltitudeDirty], a
   ret
 
-export Altitude_Init, Altitude_Add, Altitude_Sub, DivAltitude, Altitude_Flush, BuildDigits
+export Altitude_Init, Altitude_Add, Altitude_Sub, DivAltitude, Altitude_Flush, BuildDigits, DrawDigits
