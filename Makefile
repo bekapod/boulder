@@ -5,6 +5,8 @@ GBDK_HOME ?= $(HOME)/gbdk/
 LCC := $(GBDK_HOME)bin/lcc
 LCCFLAGS := -debug -Wm-yS
 CSRCS := $(wildcard src/*.c)
+PNG2ASSET := $(GBDK_HOME)bin/png2asset
+RESSRCS := res/title.c
 
 MAP_PNGS := $(wildcard art/*_map.png)
 FULLSCREEN_PNGS := art/title.png art/gameover.png
@@ -27,8 +29,8 @@ $(BUILD)/$(ROM_NAME).gb: $(OBJS)
 $(BUILD)/%.o: %.rgbasm $(CHRS) $(TLMS) $(wildcard *.rgbinc) | $(BUILD)
 	rgbasm -Werror -Weverything -I $(BUILD) -o $@ $<
 
-$(BUILD)/$(ROM_NAME)-c.gb: $(CSRCS) $(wildcard src/*.h) | $(BUILD)
-	$(LCC) $(LCCFLAGS) -o $@ $(CSRCS)
+$(BUILD)/$(ROM_NAME)-c.gb: $(CSRCS) $(RESSRCS) $(wildcard src/*.h) | $(BUILD)
+	$(LCC) $(LCCFLAGS) -o $@ $(CSRCS) $(RESSRCS)
 
 $(BUILD)/%_map.tlm: art/%_map.png $(BUILD)/tileset.chr | $(BUILD)
 	rgbgfx --unique-tiles --input-tileset $(BUILD)/tileset.chr --tilemap $@ $<
@@ -42,6 +44,12 @@ $(patsubst art/%.png,$(BUILD)/%.tlm,$(FULLSCREEN_PNGS)): $(BUILD)/%.tlm: art/%.p
 	rgbgfx --colors '#9bbc0f,#8bac0f,#306230,#0f380f' --unique-tiles --tilemap $@ --output $(BUILD)/$*.chr $<
 
 $(patsubst art/%.png,$(BUILD)/%.chr,$(FULLSCREEN_PNGS)): $(BUILD)/%.chr: $(BUILD)/%.tlm ;
+
+$(patsubst art/%.png,res/%.c,$(FULLSCREEN_PNGS)): res/%.c: art/%.png | res
+	$(PNG2ASSET) $< -o $@ -map -noflip -keep_palette_order -no_palettes
+
+res:
+	mkdir -p res
 
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -58,4 +66,4 @@ sweep: $(BUILD)/$(ROM_NAME).gb
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) res

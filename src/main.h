@@ -15,5 +15,6 @@ enum state_id {
 };
 
 extern uint8_t state;
+extern uint8_t input_pressed;
 
 #endif

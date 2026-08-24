@@ -3,17 +3,22 @@
 START advances TITLE and retries from GAMEOVER, and does nothing during PLAY
 """
 
-from helpers import force_game_over, ROOT
+import pytest
+
+from helpers import ROOT, force_game_over
 
 
+@pytest.mark.c_ready
 def test_rom_boots_without_crashing(gb):
     assert gb.tick(60), "emulator stopped during the first second of runtime"
 
 
+@pytest.mark.c_ready
 def test_initial_state_is_title(gb, states):
     assert gb.state == states["STATE_TITLE"]
 
 
+@pytest.mark.c_ready
 def test_start_advances_title_to_play(gb, states):
     gb.press("start")
     assert gb.state == states["STATE_PLAY"]
@@ -36,6 +41,7 @@ def test_full_loop_play_gameover_retry(gb, states):
     assert gb.state == states["STATE_PLAY"]
 
 
+@pytest.mark.c_ready
 def test_title_screen_shows_the_title_map(gb):
     """Boot draws title.tlm into the BG map at one uniform tile offset."""
     tlm = (ROOT / "build" / "title.tlm").read_bytes()

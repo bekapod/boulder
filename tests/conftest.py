@@ -5,11 +5,11 @@ tick N frames, assert against WRAM by symbol name (from boulder.sym).
 Any symbol a test reads must be `export`ed in the rgbasm source.
 """
 
-import re
-
-import helpers
 import pytest
 from pyboy import PyBoy
+
+import helpers
+import rom_adapter
 
 ROOT = helpers.ROOT
 ROM = helpers.ROM
@@ -47,18 +47,12 @@ class Harness:
 
     @property
     def state(self) -> int:
-        return self.read("wStateId")
+        return self.read(rom_adapter.symbol("state"))
 
 
 @pytest.fixture(scope="session")
 def states() -> dict[str, int]:
-    """STATE_* ids parsed from utils.rgbinc (equ constants aren't in the .sym)."""
-    src = (ROOT / "utils.rgbinc").read_text()
-    found = {
-        m[0]: int(m[1]) for m in re.findall(r"(?m)^def (STATE_\w+) equ (\d+)", src)
-    }
-    assert found, "no STATE_* constants found in utils.rgbinc"
-    return found
+    return rom_adapter.states()
 
 
 @pytest.fixture(scope="session")
