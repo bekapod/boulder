@@ -6,9 +6,11 @@ from pathlib import Path
 
 import pytest
 
+import rom_adapter
+
 ROOT = Path(__file__).resolve().parent.parent
-ROM = ROOT / "build" / "boulder.gb"
-SYM = ROOT / "build" / "boulder.sym"
+ROM = rom_adapter.ROM
+SYM = rom_adapter.SYM
 
 # Upper bound on boot ROM (~70 frames) + our init before we call the ROM broken.
 BOOT_CAP_FRAMES = 600
@@ -22,11 +24,11 @@ def wait_for_boot(pyboy) -> None:
     """Tick past PyBoy's ~70-frame boot ROM until Title_Update executes,
     proving init is done and input polling has started."""
     booted = []
-    pyboy.hook_register(None, "Title_Update", lambda _: booted.append(True), None)
+    rom_adapter.hook(pyboy, "title_update", lambda _: booted.append(True))
     for _ in range(BOOT_CAP_FRAMES):
         pyboy.tick(1, render=False)
         if booted:
-            pyboy.hook_deregister(None, "Title_Update")
+            rom_adapter.unhook(pyboy, "title_update")
             return
     raise RuntimeError(
         f"ROM did not reach the main loop within {BOOT_CAP_FRAMES} frames"

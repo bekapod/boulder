@@ -10,3 +10,6 @@ dependencies = [
 
 [tool.pytest.ini_options]
 addopts = "-q"
+markers = [
+    "c_ready: passes against the C ROM",
+]
