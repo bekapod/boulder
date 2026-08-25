@@ -1,3 +1,5 @@
+import pytest
+
 from helpers import (
     SWEET_HI,
     SWEET_LO,
@@ -20,6 +22,7 @@ def apu(gb, addr):
     return gb.pyboy.memory[addr]
 
 
+@pytest.mark.c_ready
 def test_apu_powered_on_at_boot(gb):
     assert apu(gb, NR52) & 0x80
     assert apu(gb, NR50) == 0x77

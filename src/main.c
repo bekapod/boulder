@@ -1,6 +1,7 @@
 #include <gbdk/platform.h>
 
 #include "main.h"
+#include "sfx.h"
 #include "title.h"
 
 uint8_t state = STATE_TITLE_INIT;
@@ -12,6 +13,9 @@ void main(void) {
     BGP_REG = 0xE4;  // background palette -> 11100100 -> lightest to darkest
     OBP0_REG = 0xE4; // sprite palette 0 -> ''
     OBP1_REG = 0x1B; // sprite palette 1 -> 00011011 -> darkest to lightest
+
+    sfx_init();
+    add_VBL(sfx_tick);
 
     while (1) {
         vsync();
