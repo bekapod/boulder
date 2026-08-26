@@ -199,6 +199,7 @@ def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
     assert progress(gb) != p  # marker is moving again
 
 
+@pytest.mark.c_ready
 def test_altitude_display_tracks_memory(gb, states):
     """set altitude to a value and check the screen shows the right digits."""
     enter_play(gb, states)

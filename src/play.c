@@ -5,6 +5,7 @@
 #include "../res/scene_map.h"
 #include "../res/tileset.h"
 
+#include "altitude.h"
 #include "main.h"
 #include "play.h"
 #include "sfx.h"
@@ -21,7 +22,6 @@ uint16_t marker_pos;
 uint8_t marker_screen_pos;
 uint8_t marker_pause;
 uint8_t cycle_frames;
-uint16_t altitude;
 uint16_t marker_step;
 uint8_t miss_streak;
 
@@ -43,11 +43,14 @@ static void recompute_cycle(void) {
 }
 
 void play_init(void) {
+#include "../res/digits_bg.h"
+
     DISPLAY_OFF;
     LCDC_REG |= LCDCF_BG8000;
 
     set_bkg_data(TILE_BAR_FIRST, bar_bg_TILE_COUNT, bar_bg_tiles);
     set_bkg_data(TILE_SCENE_FIRST, tileset_TILE_COUNT, tileset_tiles);
+    set_bkg_data(TILE_DIGIT_FIRST, digits_bg_TILE_COUNT, digits_bg_tiles);
 
     set_sprite_data(TILE_MARKER, marker_obj_TILE_COUNT, marker_obj_tiles);
 
@@ -76,6 +79,7 @@ void play_init(void) {
     flash_frames = 0;
     flash_pending = 0;
 
+    altitude_init();
     recompute_cycle();
 
     LCDC_REG = LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ8 | LCDCF_OBJON | LCDCF_BGON;
@@ -137,7 +141,7 @@ static void update_slip(void) {
     slip_counter = 0;
 
     if (altitude != 0) {
-        altitude--;
+        altitude_sub(1);
     }
 }
 
@@ -149,12 +153,12 @@ void judge_hit(void) {
     flash_frames = HIT_FREEZE_FRAMES;
     flash_pending = TILE_BAR_DARK_FIRST;
     sfx_play(SFX_CHIME);
-    altitude += HIT_REWARD;
+    altitude_add(HIT_REWARD);
 }
 
 void judge_miss(void) {
     sfx_play(SFX_THUD);
-    altitude -= altitude / MISS_PENALTY_DIV;
+    altitude_sub(altitude / MISS_PENALTY_DIV);
     marker_pause = MISS_FREEZE_FRAMES;
     miss_streak++;
 
@@ -197,6 +201,8 @@ void play_update(void) {
 }
 
 void play_vblank(void) {
+    altitude_flush();
+
     if (!flash_pending) {
         return;
     }

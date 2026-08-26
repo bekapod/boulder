@@ -6,7 +6,7 @@ LCC := $(GBDK_HOME)bin/lcc
 LCCFLAGS := -debug -Wm-yS
 CSRCS := $(wildcard src/*.c)
 PNG2ASSET := $(GBDK_HOME)bin/png2asset
-RESSRCS := res/title.c res/marker_obj.c res/bar_bg.c res/tileset.c res/scene_map.c
+RESSRCS := res/title.c res/marker_obj.c res/bar_bg.c res/tileset.c res/scene_map.c res/digits_bg.c
 
 MAP_PNGS := $(wildcard art/*_map.png)
 FULLSCREEN_PNGS := art/title.png art/gameover.png
