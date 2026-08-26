@@ -38,17 +38,12 @@ def wait_for_boot(pyboy) -> None:
 def parse_rgbinc(filename: str) -> dict[str, int]:
     """def NAME equ EXPR constants from an rgbinc, resolved top to bottom"""
     src = (ROOT / filename).read_text()
-    found: dict[str, int] = {"_SCRN0": 0x9800}
-    for name, expr in re.findall(r"(?m)^def (\w+) equ (.+?)\s*(?:;.*)?$", src):
-        expr = re.sub(r"\$([0-9A-Fa-f]+)", r"0x\1", expr)  # rgbasm hex -> python hex
-        # eval is safe here: input is our own repo's tuning.rgbinc, not
-        # external data, and builtins are stripped. ast.literal_eval can't
-        # be used because expressions reference earlier constants by name.
-        try:
-            found[name] = int(eval(expr, {"__builtins__": {}}, found))
-        except NameError:
-            continue
-    assert found, "no constants found in tuning.rgbinc"
+    pairs = [
+        (name, re.sub(r"\$([0-9A-Fa-f]+)", r"0x\1", expr))  # rgbasm hex -> python hex
+        for name, expr in re.findall(r"(?m)^def (\w+) equ (.+?)\s*(?:;.*)?$", src)
+    ]
+    found = rom_adapter.eval_defs(pairs, seed={"_SCRN0": 0x9800})
+    assert found, f"no constants found in {filename}"
     return found
 
 

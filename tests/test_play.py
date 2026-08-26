@@ -1,3 +1,5 @@
+import pytest
+
 from helpers import (
     SWEET_HI,
     SWEET_LO,
@@ -35,6 +37,7 @@ def expected_cells(altitude):
     ]
 
 
+@pytest.mark.c_ready
 def test_perfect_press_rewards_and_forgives(gb, states, tuning):
     """hit at center -> altitude +10, streak back to 0."""
     enter_play(gb, states)
@@ -92,6 +95,7 @@ def test_three_misses_end_the_game(gb, states, tuning):
     assert digit_cells(gb) == expected_cells(0)
 
 
+@pytest.mark.c_ready
 def test_slip_bleeds_but_never_kills(gb, states, tuning):
     """idle costs 1m per 30 frames; at 0m nothing happens, ever."""
     enter_play(gb, states)
@@ -112,6 +116,7 @@ def test_slip_bleeds_but_never_kills(gb, states, tuning):
     assert gb.read16("altitude") == 95
 
 
+@pytest.mark.c_ready
 def test_cycle_tracks_altitude_both_ways(gb, states, tuning):
     """250m -> cycle 50; back down -> re-lengthens; floor holds."""
     enter_play(gb, states)
@@ -148,6 +153,7 @@ def test_cycle_tracks_altitude_both_ways(gb, states, tuning):
     )
 
 
+@pytest.mark.c_ready
 def test_pause_presses_are_ignored(gb, states, tuning):
     """a press during the endpoint pause neither strikes or misses."""
     enter_play(gb, states)
@@ -162,6 +168,7 @@ def test_pause_presses_are_ignored(gb, states, tuning):
     assert gb.read16("altitude") == before + tuning["HIT_REWARD"]
 
 
+@pytest.mark.c_ready
 def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
     """a hit halts the marker and darkens the spot, both for HIT_FREEZE_FRAMES."""
     SPOT = (

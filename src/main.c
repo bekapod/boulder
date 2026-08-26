@@ -27,6 +27,9 @@ void main(void) {
         case STATE_TITLE:
             title_vblank();
             break;
+        case STATE_PLAY:
+            play_vblank();
+            break;
         }
 
         uint8_t held = joypad();

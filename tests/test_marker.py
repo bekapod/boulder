@@ -2,8 +2,8 @@ import itertools
 
 import pytest
 
-import rom_adapter
 import helpers
+import rom_adapter
 
 pytestmark = pytest.mark.c_ready
 

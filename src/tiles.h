@@ -19,4 +19,7 @@
 #define BAR_TILE_ROW 16
 #define BAR_WIDTH_TILES 9
 
+#define FLASH_TILE_OFFSET 3
+#define FLASH_TILE_COUNT 3
+
 #endif

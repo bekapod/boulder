@@ -61,8 +61,25 @@ def states() -> dict[str, int]:
     return found
 
 
+def eval_defs(pairs, seed=None) -> dict[str, int]:
+    """Resolve (name, expr) constants top to bottom, earlier names usable
+    in later exprs. eval is safe here: input is our own repo's headers,
+    not external data, and builtins are stripped. ast.literal_eval can't
+    be used because expressions reference earlier constants by name.
+    int() truncates toward zero, matching C division for the positive
+    values tuning uses. An expr naming a constant from another file is
+    skipped."""
+    found: dict[str, int] = dict(seed or {})
+    for name, expr in pairs:
+        try:
+            # safe: our own repo's headers, no builtins (see docstring)
+            found[name] = int(eval(expr, {"__builtins__": {}}, found))
+        except NameError:
+            continue
+    return found
+
+
 def parse_cdefs(filename):
     """#define NAME EXPR constants from a header file"""
     src = (ROOT / "src" / filename).read_text()
-    found = {m[0]: int(m[1]) for m in re.findall(r"(?m)^#define (\w+) (\d+)$", src)}
-    return found
+    return eval_defs(re.findall(r"(?m)^#define (\w+) +(.+?)\s*(?:(?://|/\*).*)?$", src))
