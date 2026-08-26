@@ -3,6 +3,7 @@ import random
 import helpers
 import playtest_bot as bot
 from playtest_bot import marker_track, plan_press
+import rom_adapter
 
 T = helpers.tuning()
 BAR = T["BAR_INNER_WIDTH"]
@@ -47,14 +48,14 @@ def test_plan_press_hits_the_window_at_every_cycle():
 def test_marker_track_matches_emulator(gb, states, tuning):
     gb.press("start")
     assert gb.state == states["STATE_PLAY"]
-    a_pos = gb.pyboy.symbol_lookup("wMarkerPos")[1]
+    a_pos = gb.pyboy.symbol_lookup(rom_adapter.symbol("marker_pos"))[1]
 
-    d0 = gb.read("wMarkerDir")
+    d0 = gb.read("marker_dir")
     helpers.tick_until(
-        gb, lambda: gb.read("wMarkerDir") != d0, helpers.SWEEP_CAP, "sweep end"
+        gb, lambda: gb.read("marker_dir") != d0, helpers.SWEEP_CAP, "sweep end"
     )
-    direction = gb.read("wMarkerDir")
-    cycle = gb.read("wCycleFrames")
+    direction = gb.read("marker_dir")
+    cycle = gb.read("cycle_frames")
     track = marker_track(cycle, direction)
 
     observed = []
@@ -63,7 +64,7 @@ def test_marker_track_matches_emulator(gb, states, tuning):
         raw = gb.pyboy.memory[a_pos] | (gb.pyboy.memory[a_pos + 1] << 8)
         if raw == 0:
             continue  # endpoint pause, or the reset after the sweep ends
-        observed.append((raw, gb.read("wMarkerScreenPos")))
+        observed.append((raw, gb.read("marker_screen_pos")))
         if len(observed) == len(track):
             break
 

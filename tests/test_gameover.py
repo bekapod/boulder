@@ -1,4 +1,4 @@
-from helpers import enter_play, force_game_over, parse_rgbinc
+from helpers import enter_play, force_game_over, parse_rgbinc, addr
 
 TILES = parse_rgbinc("tiles.rgbinc")
 GO = parse_rgbinc("gameover.rgbasm")
@@ -10,7 +10,7 @@ BLINK_PERIOD = 2 * BLINK["BLINK_FRAMES"] + 10
 
 def sprite(gb, slot):
     """One shadow-OAM entry as [y, x, tile, attrs]."""
-    a = gb.pyboy.symbol_lookup("wShadowOAM")[1] + slot * 4
+    a = addr(gb, "shadow_OAM") + slot * 4
     return list(gb.pyboy.memory[a : a + 4])
 
 
@@ -32,21 +32,21 @@ def newbest_visible(gb):
 
 def test_run_shows_death_altitude(gb, states):
     enter_play(gb, states)
-    gb.set16("wAltitude", 500)
+    gb.set16("altitude", 500)
     force_game_over(gb, states)
     assert value_digits(gb, GO["SPR_RUN_VALUE"]) == expected_digits(
-        gb.read16("wAltitude")
+        gb.read16("altitude")
     )
 
 
 def test_record_updates_best_and_blinks(gb, states):
     enter_play(gb, states)
-    gb.set16("wAltitude", 500)
+    gb.set16("altitude", 500)
     force_game_over(gb, states)
 
-    final = gb.read16("wAltitude")
+    final = gb.read16("altitude")
     assert final > 0, "death spiral drained the altitude to zero"
-    assert gb.read16("wBest") == final
+    assert gb.read16("best") == final
     assert value_digits(gb, GO["SPR_BEST_VALUE"]) == expected_digits(final)
 
     seen = set()
@@ -58,11 +58,11 @@ def test_record_updates_best_and_blinks(gb, states):
 
 def test_no_record_leaves_best_alone(gb, states):
     enter_play(gb, states)
-    gb.set16("wBest", 900)
-    gb.set16("wAltitude", 500)
+    gb.set16("best", 900)
+    gb.set16("altitude", 500)
     force_game_over(gb, states)
 
-    assert gb.read16("wBest") == 900
+    assert gb.read16("best") == 900
     assert value_digits(gb, GO["SPR_BEST_VALUE"]) == expected_digits(900)
     for _ in range(BLINK_PERIOD):
         assert not newbest_visible(gb)

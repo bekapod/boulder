@@ -1,24 +1,26 @@
 import itertools
 
+import pytest
+
+import rom_adapter
+import helpers
+
+pytestmark = pytest.mark.c_ready
+
 MEASURED_SWEEPS = 5
 
 
 def _hook_sweep_ends(gb) -> tuple[list[int], list[tuple[str, int]]]:
     clock = [0]
     ends: list[tuple[str, int]] = []
-    _bank, dir_addr = gb.pyboy.symbol_lookup("wMarkerDir")
+    dir_addr = helpers.addr(gb, "marker_dir")
 
     def on_end(_):
         # fires before the direction flip: 0 = was moving right, so just arrived at the right end
         side = "right" if gb.pyboy.memory[dir_addr] == 0 else "left"
         ends.append((side, clock[0]))
 
-    gb.pyboy.hook_register(
-        None,
-        "MoveMarker.sweep_ended",
-        on_end,
-        None,
-    )
+    rom_adapter.hook(gb.pyboy, "sweep_ended", on_end)
 
     return clock, ends
 
@@ -63,7 +65,7 @@ def test_sweep_speed_follows_altitude(gb, tuning):
     slow_period = tuning["CYCLE_FRAMES"] + tuning["MARKER_PAUSE_FRAMES"]
 
     gb.press("start")
-    gb.set16("wAltitude", altitude)
+    gb.set16("altitude", altitude)
 
     clock, ends = _hook_sweep_ends(gb)
     _run(gb, clock, slow_period + (MEASURED_SWEEPS + 2) * fast_period)
@@ -78,7 +80,7 @@ def test_sweep_speed_follows_altitude(gb, tuning):
 
 def test_marker_position_stays_in_bounds(gb, tuning):
     gb.press("start")
-    _bank, oam_addr = gb.pyboy.symbol_lookup("wShadowOAM")
+    oam_addr = helpers.addr(gb, "shadow_OAM")
     oam_x = oam_addr + 1
 
     seen = set()

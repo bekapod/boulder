@@ -24,7 +24,7 @@ class Harness:
 
     def read(self, symbol: str) -> int:
         """Read one byte of WRAM by its exported symbol name."""
-        return self.pyboy.memory[self.pyboy.symbol_lookup(symbol)]
+        return self.pyboy.memory[self.pyboy.symbol_lookup(rom_adapter.symbol(symbol))]
 
     def tick(self, frames: int = 1) -> bool:
         """Advance emulation; False means the emulator has stopped."""
@@ -37,17 +37,17 @@ class Harness:
 
     def read16(self, symbol: str) -> int:
         """Read a little-endian 16-bit WRAM value by symbol name."""
-        a = self.pyboy.symbol_lookup(symbol)[1]
+        a = self.pyboy.symbol_lookup(rom_adapter.symbol(symbol))[1]
         return self.pyboy.memory[a] | (self.pyboy.memory[a + 1] << 8)
 
     def set16(self, symbol: str, value: int) -> None:
-        a = self.pyboy.symbol_lookup(symbol)[1]
+        a = self.pyboy.symbol_lookup(rom_adapter.symbol(symbol))[1]
         self.pyboy.memory[a] = value & 0xFF
         self.pyboy.memory[a + 1] = value >> 8
 
     @property
     def state(self) -> int:
-        return self.read(rom_adapter.symbol("state"))
+        return self.read("state")
 
 
 @pytest.fixture(scope="session")

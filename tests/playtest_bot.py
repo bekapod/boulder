@@ -14,6 +14,7 @@ from pathlib import Path
 from pyboy import PyBoy
 
 import helpers
+import rom_adapter
 
 ROOT = helpers.ROOT
 ROM = helpers.ROM
@@ -77,13 +78,12 @@ def play_run(
     mu: float = 0.0,
     max_frames: int = DEFAULT_MAX_FRAMES,
 ) -> RunStats:
-    """Drive one run from STATE_PLAY until game over (or max_frames).
-    """
+    """Drive one run from STATE_PLAY until game over (or max_frames)."""
     mem = pyboy.memory
-    a_state = pyboy.symbol_lookup("wStateId")[1]
-    a_dir = pyboy.symbol_lookup("wMarkerDir")[1]
-    a_alt = pyboy.symbol_lookup("wAltitude")[1]
-    a_pressed = pyboy.symbol_lookup("wInputPressed")[1]
+    a_state = pyboy.symbol_lookup(rom_adapter.symbol("state"))[1]
+    a_dir = pyboy.symbol_lookup(rom_adapter.symbol("marker_dir"))[1]
+    a_alt = pyboy.symbol_lookup(rom_adapter.symbol("altitude"))[1]
+    a_pressed = pyboy.symbol_lookup(rom_adapter.symbol("input_pressed"))[1]
 
     def altitude() -> int:
         return mem[a_alt] | (mem[a_alt + 1] << 8)
@@ -110,19 +110,13 @@ def play_run(
             clock["frame"] + 1 + PAUSE + n + jitter, clock["frame"] + 1
         )
 
-    pyboy.hook_register(None, "JudgePress", on_judge, None)
-    pyboy.hook_register(None, "MoveMarker.sweep_ended", on_sweep_end, None)
-    pyboy.hook_register(
-        None,
-        "JudgePress.hit",
-        lambda _: judged.__setitem__("hit", judged["hit"] + 1),
-        None,
+    rom_adapter.hook(pyboy, "judge_press", on_judge)
+    rom_adapter.hook(pyboy, "sweep_ended", on_sweep_end)
+    rom_adapter.hook(
+        pyboy, "judge_hit", lambda _: judged.__setitem__("hit", judged["hit"] + 1)
     )
-    pyboy.hook_register(
-        None,
-        "JudgePress.miss",
-        lambda _: judged.__setitem__("miss", judged["miss"] + 1),
-        None,
+    rom_adapter.hook(
+        pyboy, "judge_miss", lambda _: judged.__setitem__("miss", judged["miss"] + 1)
     )
     frame = 0
     try:
@@ -135,10 +129,10 @@ def play_run(
         else:
             stats.survived = True
     finally:
-        pyboy.hook_deregister(None, "JudgePress")
-        pyboy.hook_deregister(None, "MoveMarker.sweep_ended")
-        pyboy.hook_deregister(None, "JudgePress.hit")
-        pyboy.hook_deregister(None, "JudgePress.miss")
+        rom_adapter.unhook(pyboy, "judge_press")
+        rom_adapter.unhook(pyboy, "sweep_ended")
+        rom_adapter.unhook(pyboy, "judge_hit")
+        rom_adapter.unhook(pyboy, "judge_miss")
 
     stats.hits = judged["hit"]
     stats.misses = judged["miss"]
@@ -159,10 +153,10 @@ def make_pyboy(rom: Path = ROM) -> PyBoy:
 
 
 def start_run(pyboy: PyBoy) -> None:
-    a_state = pyboy.symbol_lookup("wStateId")[1]
-    a_fn = pyboy.symbol_lookup("wStateFn")[1]
-    a_alt = pyboy.symbol_lookup("wAltitude")[1]
-    play_init = pyboy.symbol_lookup("Play_Init")[1]
+    a_state = helpers.addr(pyboy, "state")
+    a_fn = helpers.addr(pyboy, "state_fn")
+    a_alt = helpers.addr(pyboy, "altitude")
+    play_init = helpers.addr(pyboy, "play_init")
     pyboy.tick(2, render=False)
     pyboy.memory[a_fn] = play_init & 0xFF
     pyboy.memory[a_fn + 1] = play_init >> 8

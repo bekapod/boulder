@@ -1,3 +1,5 @@
+import pytest
+
 from helpers import (
     SWEET_HI,
     SWEET_LO,
@@ -25,6 +27,7 @@ def oam_addr(entry: int, field: int) -> int:
     return OAM_BASE + entry * OAM_ENTRY_SIZE + field
 
 
+@pytest.mark.c_ready
 def test_sprite_x_moves_in_play(gb):
     gb.press("start")
     x_before = gb.pyboy.memory[0xFE01]

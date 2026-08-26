@@ -1,6 +1,7 @@
 #include <gbdk/platform.h>
 
 #include "main.h"
+#include "play.h"
 #include "sfx.h"
 #include "title.h"
 
@@ -46,9 +47,10 @@ void main(void) {
             title_update();
             break;
         case STATE_PLAY_INIT:
-            state = STATE_PLAY;
+            play_init();
             break;
         case STATE_PLAY:
+            play_update();
             break;
         case STATE_GAMEOVER_INIT:
             state = STATE_GAMEOVER;

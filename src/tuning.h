@@ -1,0 +1,10 @@
+#ifndef TUNING_H
+#define TUNING_H
+
+#define CYCLE_FRAMES 60
+#define MARKER_CYCLE_MIN 4
+#define MARKER_PAUSE_FRAMES 4
+#define BAR_INNER_WIDTH 64
+#define METRES_PER_SPEEDUP 10
+
+#endif

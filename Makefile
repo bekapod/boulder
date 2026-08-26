@@ -6,7 +6,7 @@ LCC := $(GBDK_HOME)bin/lcc
 LCCFLAGS := -debug -Wm-yS
 CSRCS := $(wildcard src/*.c)
 PNG2ASSET := $(GBDK_HOME)bin/png2asset
-RESSRCS := res/title.c
+RESSRCS := res/title.c res/marker_obj.c res/bar_bg.c res/tileset.c res/scene_map.c
 
 MAP_PNGS := $(wildcard art/*_map.png)
 FULLSCREEN_PNGS := art/title.png art/gameover.png
@@ -45,6 +45,13 @@ $(patsubst art/%.png,$(BUILD)/%.tlm,$(FULLSCREEN_PNGS)): $(BUILD)/%.tlm: art/%.p
 
 $(patsubst art/%.png,$(BUILD)/%.chr,$(FULLSCREEN_PNGS)): $(BUILD)/%.chr: $(BUILD)/%.tlm ;
 
+$(patsubst art/%.png,res/%.c,$(MAP_PNGS)): res/%.c: art/%.png art/tileset.png | res
+	$(PNG2ASSET) $< -o $@ -map -source_tileset art/tileset.png -noflip -keep_palette_order -no_palettes > $@.log 2>&1 || { cat $@.log; false; }
+	! grep -q "not in the source tileset" $@.log || { cat $@.log; false; }
+
+$(patsubst art/%.png,res/%.c,$(SHEET_PNGS)): res/%.c: art/%.png | res
+	$(PNG2ASSET) $< -o $@ -map -tiles_only -keep_duplicate_tiles -noflip -keep_palette_order -no_palettes
+
 $(patsubst art/%.png,res/%.c,$(FULLSCREEN_PNGS)): res/%.c: art/%.png | res
 	$(PNG2ASSET) $< -o $@ -map -noflip -keep_palette_order -no_palettes
 
@@ -55,6 +62,8 @@ $(BUILD):
 	mkdir -p $(BUILD)
 
 .SECONDARY: $(CHRS) $(TLMS)
+
+.DELETE_ON_ERROR:
 
 .PHONY: test
 test: all

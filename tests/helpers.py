@@ -17,7 +17,7 @@ BOOT_CAP_FRAMES = 600
 
 # Frames to run after an input so the update + the new state's init
 # have both executed.
-SETTLE_FRAMES = 4
+SETTLE_FRAMES = 8
 
 
 def wait_for_boot(pyboy) -> None:
@@ -73,11 +73,11 @@ SWEEP_CAP = (
 
 
 def addr(gb, symbol: str) -> int:
-    return gb.pyboy.symbol_lookup(symbol)[1]
+    return gb.pyboy.symbol_lookup(rom_adapter.symbol(symbol))[1]
 
 
 def screen_pos(gb) -> int:
-    return gb.read("wMarkerScreenPos")
+    return gb.read("marker_screen_pos")
 
 
 def progress(gb) -> int:
@@ -85,7 +85,7 @@ def progress(gb) -> int:
 
     Stays at 0 for the whole endpoint pause, so progress >= 2 also proves the marker is moving (i.e. presses will be judged)."""
 
-    return gb.pyboy.memory[addr(gb, "wMarkerPos") + 1]
+    return gb.pyboy.memory[addr(gb, "marker_pos") + 1]
 
 
 def tick_until(gb, cond, cap: int, what: str) -> None:
@@ -103,8 +103,8 @@ def enter_play(gb, states) -> None:
 
 def next_sweep(gb) -> None:
     """Run until the endpoint flip that starts a fresh (unjudged) sweep."""
-    d = gb.read("wMarkerDir")
-    tick_until(gb, lambda: gb.read("wMarkerDir") != d, SWEEP_CAP, "sweep end")
+    d = gb.read("marker_dir")
+    tick_until(gb, lambda: gb.read("marker_dir") != d, SWEEP_CAP, "sweep end")
 
 
 def tap_a(gb) -> None:

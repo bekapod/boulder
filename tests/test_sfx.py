@@ -50,6 +50,6 @@ def test_miss_plays_thud_on_ch4(gb, states):
 def test_idle_slip_is_silent(gb, states, tuning):
     """slip is not a miss: a deduction happens with no channel sounding."""
     enter_play(gb, states)
-    gb.set16("wAltitude", 100)
-    tick_until(gb, lambda: gb.read16("wAltitude") < 100, 35, "first slip tick")
+    gb.set16("altitude", 100)
+    tick_until(gb, lambda: gb.read16("altitude") < 100, 35, "first slip tick")
     assert apu(gb, NR52) & 0x0F == 0

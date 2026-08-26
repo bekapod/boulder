@@ -39,41 +39,41 @@ def test_perfect_press_rewards_and_forgives(gb, states, tuning):
     """hit at center -> altitude +10, streak back to 0."""
     enter_play(gb, states)
     miss_once(gb)
-    assert gb.read("wMissStreak") == 1
+    assert gb.read("miss_streak") == 1
 
     next_sweep(gb)
     tick_until(gb, lambda: SWEET_LO <= screen_pos(gb) <= SWEET_HI, 200, "sweet spot")
-    before = gb.read16("wAltitude")
+    before = gb.read16("altitude")
     tap_a(gb)
-    assert gb.read16("wAltitude") == before + tuning["HIT_REWARD"]
-    assert gb.read("wMissStreak") == 0
+    assert gb.read16("altitude") == before + tuning["HIT_REWARD"]
+    assert gb.read("miss_streak") == 0
 
 
 def test_three_misses_end_the_game(gb, states, tuning):
     """altitude/MISS_PENALTY_DIV lost per miss, floor-rounded; third
     strike -> GAMEOVER, 0m."""
     enter_play(gb, states)
-    gb.set16("wAltitude", 47)
+    gb.set16("altitude", 47)
 
     miss_once(gb)
-    assert gb.read16("wAltitude") == 47 - 47 // tuning["MISS_PENALTY_DIV"]
-    assert gb.read("wMissStreak") == 1
+    assert gb.read16("altitude") == 47 - 47 // tuning["MISS_PENALTY_DIV"]
+    assert gb.read("miss_streak") == 1
 
     for strike in (2, 3):
         next_sweep(gb)
         miss_once(gb)
         if strike < tuning["MISS_LIMIT"]:
-            assert gb.read("wMissStreak") == strike
+            assert gb.read("miss_streak") == strike
             assert gb.state == states["STATE_PLAY"]
 
     assert gb.state == states["STATE_TUMBLE"]
 
-    final = gb.read16("wAltitude")
+    final = gb.read16("altitude")
     tap_a(gb)
     tap_a(gb)
     tap_a(gb)
 
-    assert final == gb.read16("wAltitude")
+    assert final == gb.read16("altitude")
     assert 0 < final < 47  # penalties + slip bled it, but it wasn't zeroed
     assert digit_cells(gb) == expected_cells(final)
 
@@ -88,7 +88,7 @@ def test_three_misses_end_the_game(gb, states, tuning):
     gb.tick(1)
     gb.press("start")
     assert gb.state == states["STATE_PLAY"]
-    assert gb.read16("wAltitude") == 0
+    assert gb.read16("altitude") == 0
     assert digit_cells(gb) == expected_cells(0)
 
 
@@ -98,51 +98,51 @@ def test_slip_bleeds_but_never_kills(gb, states, tuning):
 
     # at bottom: no bleed, no strikes, still PLAY
     gb.tick(tuning["SLIP_FRAMES"] * 10)
-    assert gb.read16("wAltitude") == 0
-    assert gb.read("wMissStreak") == 0
+    assert gb.read16("altitude") == 0
+    assert gb.read("miss_streak") == 0
     assert gb.state == states["STATE_PLAY"]
 
     # sync to the slip phase: raise altitude, run to the next deduction
-    gb.set16("wAltitude", 100)
-    tick_until(gb, lambda: gb.read16("wAltitude") < 100, 35, "first slip tick")
-    assert gb.read16("wAltitude") == 99
+    gb.set16("altitude", 100)
+    tick_until(gb, lambda: gb.read16("altitude") < 100, 35, "first slip tick")
+    assert gb.read16("altitude") == 99
     gb.tick(tuning["SLIP_FRAMES"])
-    assert gb.read16("wAltitude") == 98
+    assert gb.read16("altitude") == 98
     gb.tick(tuning["SLIP_FRAMES"] * 3)
-    assert gb.read16("wAltitude") == 95
+    assert gb.read16("altitude") == 95
 
 
 def test_cycle_tracks_altitude_both_ways(gb, states, tuning):
     """250m -> cycle 50; back down -> re-lengthens; floor holds."""
     enter_play(gb, states)
-    assert gb.read("wCycleFrames") == tuning["CYCLE_FRAMES"]
+    assert gb.read("cycle_frames") == tuning["CYCLE_FRAMES"]
 
-    gb.set16("wAltitude", 250)
+    gb.set16("altitude", 250)
     tick_until(
         gb,
-        lambda: gb.read("wCycleFrames") != tuning["CYCLE_FRAMES"],
+        lambda: gb.read("cycle_frames") != tuning["CYCLE_FRAMES"],
         200,
         "cycle recalc",
     )
     # the slip bleeds a few metres while the sweep finishes, so don't demand
     # exactly 50
     expected = (
-        tuning["CYCLE_FRAMES"] - gb.read16("wAltitude") // tuning["METRES_PER_SPEEDUP"]
+        tuning["CYCLE_FRAMES"] - gb.read16("altitude") // tuning["METRES_PER_SPEEDUP"]
     )
-    assert gb.read("wCycleFrames") == expected
+    assert gb.read("cycle_frames") == expected
 
-    gb.set16("wAltitude", 0)  # losing height slows the bar
+    gb.set16("altitude", 0)  # losing height slows the bar
     tick_until(
         gb,
-        lambda: gb.read("wCycleFrames") == tuning["CYCLE_FRAMES"],
+        lambda: gb.read("cycle_frames") == tuning["CYCLE_FRAMES"],
         200,
         "cycle back to 60",
     )
 
-    gb.set16("wAltitude", 5000)
+    gb.set16("altitude", 5000)
     tick_until(
         gb,
-        lambda: gb.read("wCycleFrames") == tuning["MARKER_CYCLE_MIN"],
+        lambda: gb.read("cycle_frames") == tuning["MARKER_CYCLE_MIN"],
         200,
         "cycle floor",
     )
@@ -152,14 +152,14 @@ def test_pause_presses_are_ignored(gb, states, tuning):
     """a press during the endpoint pause neither strikes or misses."""
     enter_play(gb, states)
     next_sweep(gb)  # returns the instant the direction flips: pause is counting
-    assert gb.read("wMarkerPause") > 0
+    assert gb.read("marker_pause") > 0
     tap_a(gb)
-    assert gb.read("wMissStreak") == 0
+    assert gb.read("miss_streak") == 0
 
     tick_until(gb, lambda: SWEET_LO <= screen_pos(gb) <= SWEET_HI, 200, "sweet spot")
-    before = gb.read16("wAltitude")
+    before = gb.read16("altitude")
     tap_a(gb)
-    assert gb.read16("wAltitude") == before + tuning["HIT_REWARD"]
+    assert gb.read16("altitude") == before + tuning["HIT_REWARD"]
 
 
 def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
@@ -179,7 +179,7 @@ def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
 
     tick_until(gb, lambda: SWEET_LO <= screen_pos(gb) <= SWEET_HI, 200, "sweet spot")
     tap_a(gb)
-    assert gb.read("wMissStreak") == 0
+    assert gb.read("miss_streak") == 0
 
     p = progress(gb)
     assert cells() != light  # flash is on
@@ -193,15 +193,15 @@ def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
 
 
 def test_altitude_display_tracks_memory(gb, states):
-    """set wAltitude to a value and check the screen shows the right digits."""
+    """set altitude to a value and check the screen shows the right digits."""
     enter_play(gb, states)
     assert digit_cells(gb) == expected_cells(0)
     assert gb.pyboy.memory[DIGITS + 3] == TILE_LETTER_M
 
     for setted in (8, 100, 247, 5000):
-        gb.set16("wAltitude", setted)
+        gb.set16("altitude", setted)
         tick_until(
-            gb, lambda: gb.read16("wAltitude") == setted - 1, 40, "slip republish"
+            gb, lambda: gb.read16("altitude") == setted - 1, 40, "slip republish"
         )
         gb.tick(2)  # the dirty flag raised mid-frame delivers at the next vblank
         assert digit_cells(gb) == expected_cells(setted - 1)
