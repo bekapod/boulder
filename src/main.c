@@ -1,5 +1,6 @@
 #include <gbdk/platform.h>
 
+#include "gameover.h"
 #include "main.h"
 #include "play.h"
 #include "sfx.h"
@@ -57,12 +58,10 @@ void main(void) {
             play_update();
             break;
         case STATE_GAMEOVER_INIT:
-            state = STATE_GAMEOVER;
+            gameover_init();
             break;
         case STATE_GAMEOVER:
-            if (input_pressed & J_START) {
-                state = STATE_PLAY_INIT;
-            }
+            gameover_update();
             break;
         case STATE_TUMBLE_INIT:
             state = STATE_TUMBLE;

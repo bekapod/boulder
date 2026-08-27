@@ -26,7 +26,7 @@ SWEET_LO = _T["SWEET_SPOT_MIN"]
 SWEET_HI = _T["SWEET_SPOT_MAX"]
 SWEET_CENTER = (SWEET_LO + SWEET_HI) / 2
 
-_STATES = helpers.parse_rgbinc("utils.rgbinc")
+_STATES = rom_adapter.states()
 STATE_PLAY = _STATES["STATE_PLAY"]
 STATE_GAMEOVER = _STATES["STATE_GAMEOVER"]
 
@@ -99,7 +99,11 @@ def play_run(
         if clock["frame"] == clock["press_at"]:
             clock["press_at"] = None
             stats.presses += 1
-            mem[a_pressed] &= ~PADF_A & 0xFF  # active-low: clear = pressed
+
+            if rom_adapter.DIALECT == "c":
+                mem[a_pressed] |= 0x10
+            else:
+                mem[a_pressed] &= ~PADF_A & 0xFF  # active-low: clear = pressed
 
     def on_sweep_end(_) -> None:
         q = altitude() // _T["METRES_PER_SPEEDUP"]
@@ -153,13 +157,17 @@ def make_pyboy(rom: Path = ROM) -> PyBoy:
 
 
 def start_run(pyboy: PyBoy) -> None:
-    a_state = helpers.addr(pyboy, "state")
-    a_fn = helpers.addr(pyboy, "state_fn")
-    a_alt = helpers.addr(pyboy, "altitude")
-    play_init = helpers.addr(pyboy, "play_init")
-    pyboy.tick(2, render=False)
-    pyboy.memory[a_fn] = play_init & 0xFF
-    pyboy.memory[a_fn + 1] = play_init >> 8
+    a_state = pyboy.symbol_lookup(rom_adapter.symbol("state"))[1]
+    a_alt = pyboy.symbol_lookup(rom_adapter.symbol("altitude"))[1]
+
+    if rom_adapter.DIALECT == "c":
+        pyboy.memory[a_state] = _STATES["STATE_PLAY_INIT"]
+    else:
+        a_fn = pyboy.symbol_lookup(rom_adapter.symbol("state_fn"))[1]
+        play_init = pyboy.symbol_lookup(rom_adapter.symbol("play_init"))[1]
+        pyboy.memory[a_fn] = play_init & 0xFF
+        pyboy.memory[a_fn + 1] = play_init >> 8
+
     pyboy.tick(helpers.SETTLE_FRAMES, render=False)
     altitude = pyboy.memory[a_alt] | (pyboy.memory[a_alt + 1] << 8)
     assert pyboy.memory[a_state] == STATE_PLAY and altitude == 0, (

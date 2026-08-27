@@ -154,6 +154,10 @@ void play_init(void) {
     DISPLAY_OFF;
     LCDC_REG |= LCDCF_BG8000;
 
+    for (uint8_t i = 0; i < 40; i++) {
+        move_sprite(i, 0, 0);
+    }
+
     set_bkg_data(TILE_BAR_FIRST, bar_bg_TILE_COUNT, bar_bg_tiles);
     set_bkg_data(TILE_SCENE_FIRST, tileset_TILE_COUNT, tileset_tiles);
     set_bkg_data(TILE_DIGIT_FIRST, digits_bg_TILE_COUNT, digits_bg_tiles);

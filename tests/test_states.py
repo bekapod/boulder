@@ -24,12 +24,14 @@ def test_start_advances_title_to_play(gb, states):
     assert gb.state == states["STATE_PLAY"]
 
 
+@pytest.mark.c_ready
 def test_start_is_ignored_during_play(gb, states):
     gb.press("start")
     gb.press("start")
     assert gb.state == states["STATE_PLAY"]
 
 
+@pytest.mark.c_ready
 def test_full_loop_play_gameover_retry(gb, states):
     gb.press("start")
     assert gb.state == states["STATE_PLAY"]

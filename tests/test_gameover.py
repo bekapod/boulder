@@ -1,4 +1,6 @@
-from helpers import enter_play, force_game_over, parse_rgbinc, addr
+import pytest
+
+from helpers import addr, enter_play, force_game_over, parse_rgbinc
 
 TILES = parse_rgbinc("tiles.rgbinc")
 GO = parse_rgbinc("gameover.rgbasm")
@@ -30,6 +32,7 @@ def newbest_visible(gb):
     return sprite(gb, GO["SPR_NEWBEST_FIRST"])[0] != 0
 
 
+@pytest.mark.c_ready
 def test_run_shows_death_altitude(gb, states):
     enter_play(gb, states)
     gb.set16("altitude", 500)
@@ -39,6 +42,7 @@ def test_run_shows_death_altitude(gb, states):
     )
 
 
+@pytest.mark.c_ready
 def test_record_updates_best_and_blinks(gb, states):
     enter_play(gb, states)
     gb.set16("altitude", 500)
@@ -56,6 +60,7 @@ def test_record_updates_best_and_blinks(gb, states):
     assert seen == {True, False}, "NEW BEST! should blink and it didn't"
 
 
+@pytest.mark.c_ready
 def test_no_record_leaves_best_alone(gb, states):
     enter_play(gb, states)
     gb.set16("best", 900)
@@ -69,6 +74,7 @@ def test_no_record_leaves_best_alone(gb, states):
         gb.tick(1)
 
 
+@pytest.mark.c_ready
 def test_ten_instant_retries(gb, states):
     enter_play(gb, states)
     for _ in range(10):
