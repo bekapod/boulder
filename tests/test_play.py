@@ -52,6 +52,7 @@ def test_perfect_press_rewards_and_forgives(gb, states, tuning):
     assert gb.read("miss_streak") == 0
 
 
+@pytest.mark.c_ready
 def test_three_misses_end_the_game(gb, states, tuning):
     """altitude/MISS_PENALTY_DIV lost per miss, floor-rounded; third
     strike -> GAMEOVER, 0m."""

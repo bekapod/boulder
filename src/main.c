@@ -28,6 +28,7 @@ void main(void) {
             title_vblank();
             break;
         case STATE_PLAY:
+        case STATE_TUMBLE:
             play_vblank();
             break;
         }
@@ -59,9 +60,15 @@ void main(void) {
             state = STATE_GAMEOVER;
             break;
         case STATE_GAMEOVER:
+            if (input_pressed & J_START) {
+                state = STATE_PLAY_INIT;
+            }
             break;
         case STATE_TUMBLE_INIT:
             state = STATE_TUMBLE;
+            break;
+        case STATE_TUMBLE:
+            play_tumble_update();
             break;
         }
     }
