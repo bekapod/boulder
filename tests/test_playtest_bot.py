@@ -13,7 +13,6 @@ SWEET_LO = T["SWEET_SPOT_MIN"]
 SWEET_HI = T["SWEET_SPOT_MAX"]
 
 
-@pytest.mark.c_ready
 def test_track_covers_the_bar_at_start_cycle():
     track = marker_track(T["CYCLE_FRAMES"], direction=0)
     assert track == sorted(track)
@@ -21,19 +20,16 @@ def test_track_covers_the_bar_at_start_cycle():
     assert track[-1] >= BAR - 2, "last judged frame should be near the right edge"
 
 
-@pytest.mark.c_ready
 def test_track_mirrors_by_direction():
     right = marker_track(T["CYCLE_FRAMES"], direction=0)
     left = marker_track(T["CYCLE_FRAMES"], direction=1)
     assert left == [BAR - p for p in right]
 
 
-@pytest.mark.c_ready
 def test_track_at_cycle_floor_is_16px_steps():
     assert marker_track(T["MARKER_CYCLE_MIN"], direction=0) == [16, 32, 48]
 
 
-@pytest.mark.c_ready
 def test_plan_press_hits_the_window_at_every_cycle():
     unhittable = []
     for cycle in range(T["MARKER_CYCLE_MIN"], T["CYCLE_FRAMES"] + 1):
@@ -51,7 +47,6 @@ def test_plan_press_hits_the_window_at_every_cycle():
     assert unhittable == [], f"no hittable frame at: {unhittable}"
 
 
-@pytest.mark.c_ready
 def test_marker_track_matches_emulator(gb, states, tuning):
     gb.press("start")
     assert gb.state == states["STATE_PLAY"]
@@ -80,7 +75,6 @@ def test_marker_track_matches_emulator(gb, states, tuning):
     assert [s for _, s in observed] == track
 
 
-@pytest.mark.c_ready
 def test_sigma_zero_bot_only_hits(gb, states):
     gb.press("start")
     assert gb.state == states["STATE_PLAY"]

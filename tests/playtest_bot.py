@@ -32,11 +32,6 @@ STATE_GAMEOVER = _STATES["STATE_GAMEOVER"]
 
 DEFAULT_MAX_FRAMES = 20_000  # ~5.6 min of game time; sigma=0 never dies
 
-# PADF_A from hardware.rgbinc; the pad struct is active-low, so a
-# CLEARED bit in wInputPressed means "A was pressed this frame"
-PADF_A = 0x01
-
-
 def marker_track(cycle: int, direction: int) -> list[int]:
     """Screen px the game would judge a press against, per movement frame."""
     inc = (BAR * 256 + cycle - 1) // cycle
@@ -100,10 +95,7 @@ def play_run(
             clock["press_at"] = None
             stats.presses += 1
 
-            if rom_adapter.DIALECT == "c":
-                mem[a_pressed] |= 0x10
-            else:
-                mem[a_pressed] &= ~PADF_A & 0xFF  # active-low: clear = pressed
+            mem[a_pressed] |= 0x10
 
     def on_sweep_end(_) -> None:
         q = altitude() // _T["METRES_PER_SPEEDUP"]
@@ -160,13 +152,7 @@ def start_run(pyboy: PyBoy) -> None:
     a_state = pyboy.symbol_lookup(rom_adapter.symbol("state"))[1]
     a_alt = pyboy.symbol_lookup(rom_adapter.symbol("altitude"))[1]
 
-    if rom_adapter.DIALECT == "c":
-        pyboy.memory[a_state] = _STATES["STATE_PLAY_INIT"]
-    else:
-        a_fn = pyboy.symbol_lookup(rom_adapter.symbol("state_fn"))[1]
-        play_init = pyboy.symbol_lookup(rom_adapter.symbol("play_init"))[1]
-        pyboy.memory[a_fn] = play_init & 0xFF
-        pyboy.memory[a_fn + 1] = play_init >> 8
+    pyboy.memory[a_state] = _STATES["STATE_PLAY_INIT"]
 
     pyboy.tick(helpers.SETTLE_FRAMES, render=False)
     altitude = pyboy.memory[a_alt] | (pyboy.memory[a_alt + 1] << 8)

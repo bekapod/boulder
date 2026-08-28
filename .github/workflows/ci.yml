@@ -7,9 +7,6 @@ permissions:
   contents: read
 
 env:
-  # Keep in step with the version noted in README prerequisites.
-  RGBDS_VERSION: v1.0.3
-  RGBDS_SHA256: 280a52061a0c516999bee75ac357628d6d50784309e0486cef25f7460e6f330b
   GBDK_VERSION: "4.5.0"
   GBDK_SHA256: d7857a5f6d135ee4c249043ca26aad9f2ec8ab5d4106d97720d404114f42605c
 
@@ -18,13 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install RGBDS
-        run: |
-          curl -fsSL -o rgbds.tar.xz "https://github.com/gbdev/rgbds/releases/download/${RGBDS_VERSION}/rgbds-linux-x86_64.tar.xz"
-          echo "${RGBDS_SHA256}  rgbds.tar.xz" | sha256sum -c
-          sudo tar -xJf rgbds.tar.xz -C /usr/local/bin rgbasm rgblink rgbfix rgbgfx
-          rgbasm --version
 
       - name: Install GBDK
         run: |
@@ -43,6 +33,3 @@ jobs:
 
       - name: Run tests
         run: make test
-
-      - name: Run C tests
-        run: make test ROM=c

@@ -2,7 +2,6 @@
 
 The vocabulary for every test: boot the ROM headless, poke/press,
 tick N frames, assert against WRAM by symbol name (from boulder.sym).
-Any symbol a test reads must be `export`ed in the rgbasm source.
 """
 
 import pytest
@@ -57,7 +56,7 @@ def states() -> dict[str, int]:
 
 @pytest.fixture(scope="session")
 def tuning() -> dict[str, int]:
-    """Gameplay-feel constants parsed from tuning.rgbinc (see helpers.tuning)."""
+    """Gameplay-feel constants parsed from tuning.h."""
     return helpers.tuning()
 
 
@@ -65,7 +64,7 @@ def tuning() -> dict[str, int]:
 def gb():
     if not ROM.exists():
         pytest.fail(
-            f"{ROM.name} not found — build it first (run `make test` from the repo root)"
+            f"{ROM.name} not found — build it first (run `make` from the repo root)"
         )
     pyboy = PyBoy(
         str(ROM),

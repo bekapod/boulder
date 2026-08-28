@@ -2,17 +2,17 @@
 
 [![CI](https://github.com/bekapod/boulder/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bekapod/boulder/actions/workflows/ci.yml)
 
-A Game Boy game, written in assembly for the original DMG hardware.
+A Game Boy game, written in C with GBDK-2020 for the original DMG hardware.
 
 ## Prerequisites
 
-- [RGBDS](https://rgbds.gbdev.io/) — the assembler toolchain (rgbasm, rgblink,
-rgbfix, rgbgfx). Tested with v1.0.3. `brew install rgbds` on a Mac.
+- [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020) — the C compiler and
+  toolchain. Tested with v4.5.0; install to `~/gbdk/` or set `GBDK_HOME`.
 - `make` — comes with the Xcode command line tools, probably already on your machine.
 - An emulator to run it. I'm using [SameBoy](https://sameboy.github.io/) atm
-and it has a debugger.
+  and it has a debugger.
 - [uv](https://docs.astral.sh/uv/) — only if you want to run the tests.
-`brew install uv`.
+  `brew install uv`.
 
 ## Building
 

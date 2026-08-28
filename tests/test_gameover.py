@@ -1,10 +1,10 @@
 import pytest
 
-from helpers import addr, enter_play, force_game_over, parse_rgbinc
+from helpers import addr, enter_play, force_game_over, parse_header
 
-TILES = parse_rgbinc("tiles.rgbinc")
-GO = parse_rgbinc("gameover.rgbasm")
-BLINK = parse_rgbinc("blink.rgbasm")
+TILES = parse_header("tiles.h")
+GO = parse_header("gameover.h")
+BLINK = parse_header("blink.h")
 
 SCRN0 = 0x9800
 BLINK_PERIOD = 2 * BLINK["BLINK_FRAMES"] + 10
@@ -29,20 +29,18 @@ def value_digits(gb, first_slot):
 
 
 def newbest_visible(gb):
-    return sprite(gb, GO["SPR_NEWBEST_FIRST"])[0] != 0
+    return sprite(gb, GO["OAM_NEWBEST_FIRST"])[0] != 0
 
 
-@pytest.mark.c_ready
 def test_run_shows_death_altitude(gb, states):
     enter_play(gb, states)
     gb.set16("altitude", 500)
     force_game_over(gb, states)
-    assert value_digits(gb, GO["SPR_RUN_VALUE"]) == expected_digits(
+    assert value_digits(gb, GO["OAM_RUN_VALUE"]) == expected_digits(
         gb.read16("altitude")
     )
 
 
-@pytest.mark.c_ready
 def test_record_updates_best_and_blinks(gb, states):
     enter_play(gb, states)
     gb.set16("altitude", 500)
@@ -51,7 +49,7 @@ def test_record_updates_best_and_blinks(gb, states):
     final = gb.read16("altitude")
     assert final > 0, "death spiral drained the altitude to zero"
     assert gb.read16("best") == final
-    assert value_digits(gb, GO["SPR_BEST_VALUE"]) == expected_digits(final)
+    assert value_digits(gb, GO["OAM_BEST_VALUE"]) == expected_digits(final)
 
     seen = set()
     for _ in range(BLINK_PERIOD):
@@ -60,7 +58,6 @@ def test_record_updates_best_and_blinks(gb, states):
     assert seen == {True, False}, "NEW BEST! should blink and it didn't"
 
 
-@pytest.mark.c_ready
 def test_no_record_leaves_best_alone(gb, states):
     enter_play(gb, states)
     gb.set16("best", 900)
@@ -68,13 +65,12 @@ def test_no_record_leaves_best_alone(gb, states):
     force_game_over(gb, states)
 
     assert gb.read16("best") == 900
-    assert value_digits(gb, GO["SPR_BEST_VALUE"]) == expected_digits(900)
+    assert value_digits(gb, GO["OAM_BEST_VALUE"]) == expected_digits(900)
     for _ in range(BLINK_PERIOD):
         assert not newbest_visible(gb)
         gb.tick(1)
 
 
-@pytest.mark.c_ready
 def test_ten_instant_retries(gb, states):
     enter_play(gb, states)
     for _ in range(10):

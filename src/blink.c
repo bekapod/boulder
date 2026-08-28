@@ -1,7 +1,5 @@
 #include "blink.h"
 
-#define BLINK_FRAMES 30
-
 static uint8_t blink_frames;
 uint8_t blink_visible;
 uint8_t blink_dirty;

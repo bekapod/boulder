@@ -5,8 +5,6 @@ import pytest
 import helpers
 import rom_adapter
 
-pytestmark = pytest.mark.c_ready
-
 MEASURED_SWEEPS = 5
 
 

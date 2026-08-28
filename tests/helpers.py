@@ -1,6 +1,5 @@
 """Play-state test vocabulary: read the marker, time presses, force outcomes."""
 
-import re
 from functools import cache
 from pathlib import Path
 
@@ -35,21 +34,14 @@ def wait_for_boot(pyboy) -> None:
     )
 
 
-def parse_rgbinc(filename: str) -> dict[str, int]:
-    """def NAME equ EXPR constants from an rgbinc, resolved top to bottom"""
-    src = (ROOT / filename).read_text()
-    pairs = [
-        (name, re.sub(r"\$([0-9A-Fa-f]+)", r"0x\1", expr))  # rgbasm hex -> python hex
-        for name, expr in re.findall(r"(?m)^def (\w+) equ (.+?)\s*(?:;.*)?$", src)
-    ]
-    found = rom_adapter.eval_defs(pairs, seed={"_SCRN0": 0x9800})
-    assert found, f"no constants found in {filename}"
-    return found
+def parse_header(filename: str) -> dict[str, int]:
+    """#define NAME EXPR constants from a C header under src/."""
+    return rom_adapter.parse_cdefs(filename)
 
 
 @cache
 def tuning() -> dict[str, int]:
-    return parse_rgbinc("tuning.rgbinc")
+    return parse_header("tuning.h")
 
 
 _T = tuning()

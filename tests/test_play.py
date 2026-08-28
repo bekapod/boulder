@@ -6,14 +6,14 @@ from helpers import (
     enter_play,
     miss_once,
     next_sweep,
-    parse_rgbinc,
+    parse_header,
     progress,
     screen_pos,
     tap_a,
     tick_until,
 )
 
-_TILES = parse_rgbinc("tiles.rgbinc")
+_TILES = parse_header("tiles.h")
 DIGITS = _TILES["ALTITUDE_MAP_ADDR"]
 TILE_DIGIT_FIRST = _TILES["TILE_DIGIT_FIRST"]
 TILE_LETTER_M = _TILES["TILE_LETTER_M"]
@@ -37,7 +37,6 @@ def expected_cells(altitude):
     ]
 
 
-@pytest.mark.c_ready
 def test_perfect_press_rewards_and_forgives(gb, states, tuning):
     """hit at center -> altitude +10, streak back to 0."""
     enter_play(gb, states)
@@ -52,7 +51,6 @@ def test_perfect_press_rewards_and_forgives(gb, states, tuning):
     assert gb.read("miss_streak") == 0
 
 
-@pytest.mark.c_ready
 def test_three_misses_end_the_game(gb, states, tuning):
     """altitude/MISS_PENALTY_DIV lost per miss, floor-rounded; third
     strike -> GAMEOVER, 0m."""
@@ -96,7 +94,6 @@ def test_three_misses_end_the_game(gb, states, tuning):
     assert digit_cells(gb) == expected_cells(0)
 
 
-@pytest.mark.c_ready
 def test_slip_bleeds_but_never_kills(gb, states, tuning):
     """idle costs 1m per 30 frames; at 0m nothing happens, ever."""
     enter_play(gb, states)
@@ -117,7 +114,6 @@ def test_slip_bleeds_but_never_kills(gb, states, tuning):
     assert gb.read16("altitude") == 95
 
 
-@pytest.mark.c_ready
 def test_cycle_tracks_altitude_both_ways(gb, states, tuning):
     """250m -> cycle 50; back down -> re-lengthens; floor holds."""
     enter_play(gb, states)
@@ -154,7 +150,6 @@ def test_cycle_tracks_altitude_both_ways(gb, states, tuning):
     )
 
 
-@pytest.mark.c_ready
 def test_pause_presses_are_ignored(gb, states, tuning):
     """a press during the endpoint pause neither strikes or misses."""
     enter_play(gb, states)
@@ -169,11 +164,10 @@ def test_pause_presses_are_ignored(gb, states, tuning):
     assert gb.read16("altitude") == before + tuning["HIT_REWARD"]
 
 
-@pytest.mark.c_ready
 def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
     """a hit halts the marker and darkens the spot, both for HIT_FREEZE_FRAMES."""
     SPOT = (
-        _TILES["_SCRN0"]
+        0x9800
         + _TILES["BAR_TILE_ROW"] * 32
         + _TILES["BAR_TILE_COL"]
         + _TILES["FLASH_TILE_OFFSET"]
@@ -200,7 +194,6 @@ def test_hit_freezes_marker_and_flashes_spot(gb, states, tuning):
     assert progress(gb) != p  # marker is moving again
 
 
-@pytest.mark.c_ready
 def test_altitude_display_tracks_memory(gb, states):
     """set altitude to a value and check the screen shows the right digits."""
     enter_play(gb, states)

@@ -80,12 +80,12 @@ void gameover_init(void) {
 
     draw_text_sprites(0, 60, 62, "GAME OVER");
     draw_text_sprites(9, 49, 79, "RUN");
-    draw_text_sprites(12, 99, 79, "000M");
-    draw_digits(12, altitude);
+    draw_text_sprites(OAM_RUN_VALUE, 99, 79, "000M");
+    draw_digits(OAM_RUN_VALUE, altitude);
     draw_text_sprites(16, 49, 89, "BEST");
-    draw_text_sprites(20, 99, 89, "000M");
-    draw_digits(20, best);
-    draw_text_sprites(24, 60, new_best ? 106 : 0, "NEW BEST!");
+    draw_text_sprites(OAM_BEST_VALUE, 99, 89, "000M");
+    draw_digits(OAM_BEST_VALUE, best);
+    draw_text_sprites(OAM_NEWBEST_FIRST, 60, new_best ? 106 : 0, "NEW BEST!");
 
     LCDC_REG = LCDCF_ON | LCDCF_BG8000 | LCDCF_OBJ8 | LCDCF_OBJON | LCDCF_BGON;
     state = STATE_GAMEOVER;
@@ -98,7 +98,7 @@ void gameover_update(void) {
         if (blink_dirty) {
             blink_dirty = 0;
             for (uint8_t i = 0; i < 9; i++) {
-                move_sprite(24 + i, 60 + i * SPRITE_PITCH, blink_visible ? 106 : 0);
+                move_sprite(OAM_NEWBEST_FIRST + i, 60 + i * SPRITE_PITCH, blink_visible ? 106 : 0);
             }
         }
     }
