@@ -23,7 +23,7 @@ jobs:
           tar -xzf gbdk.tar.gz -C "$HOME"
           echo "GBDK_HOME=$HOME/gbdk/" >> "$GITHUB_ENV"
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: tests/uv.lock
